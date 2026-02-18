@@ -1,0 +1,7 @@
+fastapi>=0.110
+uvicorn[standard]>=0.27
+websockets>=12.0
+google-cloud-speech>=2.24
+google-auth>=2.27
+vertexai>=1.0
+pydantic>=2.5
