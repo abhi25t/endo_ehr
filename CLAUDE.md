@@ -385,8 +385,16 @@ Format: `Subsection(Name=Value)` or `Section(Name=Value)`
 - Does NOT update `lastSavedReportState` (report remains "unsaved")
 - DOES validate disease names against loaded `DISEASES` object
 - DOES normalize sublocations (same logic as `loadJsonFromText()`)
-- DOES preserve currently active disease if it still exists in updated report
+- DOES auto-add matrix region names when "Region - Option" sublocations are present (e.g., adds "Antrum" when "Antrum - Posterior Wall" exists)
+- DOES detect newly added diseases and switch `active` to the latest one (so details pane opens automatically)
+- DOES preserve currently active disease if no new diseases were added
 - Calls `populateColumns()`, `renderSubLocChips()`, `renderReport()`, `openDetails()`
+
+### Batcher Flush on Stop
+- When dictation stops, the `finally` block sends `{"flush": True}` to the transcript queue
+- Batcher handles flush by breaking the debounce loop and processing remaining accumulated text
+- Server waits up to 15s for the batcher to finish (including final LLM call) before cleanup
+- Ensures the last spoken sentence is always processed
 
 ## Data Model
 
@@ -506,6 +514,10 @@ Validation pipeline: Parse JSON → Pydantic model_validate → strip invalid lo
 8. ✅ `loadedCsvText` shared via `06-state.js` (was duplicated/lost between `17-csv-upload.js` and `19-voice.js`)
 9. ✅ `voiceScheduleSync()` wired to `renderReport()` (was defined but never called)
 10. ✅ Disease-location validation in `models.py` (LLM could place diseases under wrong locations)
+11. ✅ Matrix region auto-select on voice update (e.g., "Antrum" auto-selected when "Antrum - Posterior Wall" set by LLM)
+12. ✅ New disease auto-opens in details pane (voice update now detects newly added diseases)
+13. ✅ Batcher flush on stop (last sentence no longer lost when stopping dictation)
+14. ✅ Sentences report PDF rendering (html2canvas requires element in normal document flow, not positioned off-viewport)
 
 ## Development Notes
 

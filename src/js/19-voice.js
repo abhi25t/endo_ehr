@@ -68,6 +68,26 @@ function applyVoiceUpdate(data) {
       } else {
         d.sublocations = d.sublocations || [];
       }
+      // Auto-add region names for matrix sublocations (e.g., "Antrum" for "Antrum - Posterior Wall")
+      const toAdd = [];
+      d.sublocations.forEach(s => {
+        const dash = s.indexOf(' - ');
+        if (dash > 0) {
+          const region = s.substring(0, dash);
+          if (!d.sublocations.includes(region) && !toAdd.includes(region)) {
+            toAdd.push(region);
+          }
+        }
+      });
+      if (toAdd.length) d.sublocations.push(...toAdd);
+    });
+  });
+
+  // Collect old disease set before replacing report
+  const oldDiseases = new Set();
+  Object.keys(report || {}).forEach(loc => {
+    Object.keys((report[loc] || {}).diseases || {}).forEach(dn => {
+      oldDiseases.add(loc + "::" + dn);
     });
   });
 
@@ -79,8 +99,20 @@ function applyVoiceUpdate(data) {
     document.getElementById("overallRemarks").value = newRemarks;
   }
 
-  // Preserve current active disease if it still exists
-  if (active && report[active.loc] &&
+  // Find newly added diseases
+  let newestDisease = null;
+  Object.keys(report).forEach(loc => {
+    Object.keys((report[loc] || {}).diseases || {}).forEach(dn => {
+      if (!oldDiseases.has(loc + "::" + dn)) {
+        newestDisease = { loc, disease: dn };
+      }
+    });
+  });
+
+  // Switch to newest disease if one was added, otherwise preserve active
+  if (newestDisease) {
+    active = newestDisease;
+  } else if (active && report[active.loc] &&
       report[active.loc].diseases &&
       report[active.loc].diseases[active.disease]) {
     // active is still valid — keep it

@@ -193,9 +193,9 @@ async function _sentencesGeneratePdf() {
 
     printDiv.appendChild(content);
 
-    // Append off-screen for html2pdf
-    printDiv.style.position = 'fixed';
-    printDiv.style.left = '-9999px';
+    // Append to body (modal overlay covers viewport so user won't see it)
+    // Must NOT use position:fixed or z-index:-1 — html2canvas can't render those
+    printDiv.style.width = '700px';
     document.body.appendChild(printDiv);
 
     var timestamp = generateTimestamp();

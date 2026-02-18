@@ -168,6 +168,10 @@ async def transcript_batcher(ws: WebSocket, session: SessionState):
         except asyncio.TimeoutError:
             continue
 
+        if "flush" in msg:
+            # Stop signal — process remaining accumulated text and exit
+            break
+
         if "error" in msg:
             await send_safe(ws, {"type": "error", "message": msg["error"]})
             continue
@@ -208,6 +212,8 @@ async def transcript_batcher(ws: WebSocket, session: SessionState):
                     session.transcript_queue.get(),
                     timeout=DEBOUNCE_SECONDS,
                 )
+                if "flush" in msg2:
+                    break
                 if "error" in msg2 or "info" in msg2:
                     continue
                 if not msg2.get("is_final"):
@@ -282,6 +288,27 @@ async def transcript_batcher(ws: WebSocket, session: SessionState):
                         await send_safe(ws, {"type": "final_transcript", "text": msg3["text"]})
             except asyncio.QueueEmpty:
                 break
+
+    # Flush: process any remaining accumulated text before exiting
+    if accumulated:
+        batch_text = " ".join(accumulated)
+        accumulated = []
+        if not is_garbage(batch_text):
+            log.info("Batcher flushing final batch: %s", batch_text[:80])
+            try:
+                updated = await call_llm_wrapper(session, batch_text)
+                if updated is not None:
+                    session.current_report = updated.get("report", {})
+                    session.overall_remarks = updated.get("overallRemarks", "")
+                    await send_safe(ws, {
+                        "type": "report_update",
+                        "report": session.current_report,
+                        "overallRemarks": session.overall_remarks,
+                    })
+            except Exception:
+                log.exception("Flush LLM error")
+
+    log.info("Batcher exiting")
 
 
 async def _handle_voice_command(ws: WebSocket, session: SessionState, cmd: str, text: str):
@@ -420,16 +447,23 @@ async def voice_ws(ws: WebSocket):
     except Exception:
         log.exception("WebSocket error")
     finally:
-        session.cancel_event.set()
         await session.audio_queue.put(None)  # Sentinel to stop ASR
 
-        for task in session.tasks:
-            task.cancel()
-            try:
-                await task
-            except (asyncio.CancelledError, Exception):
-                pass
+        # Tell batcher to flush remaining text before exiting
+        await session.transcript_queue.put({"flush": True})
 
+        # Wait for batcher to process final batch (may include LLM call)
+        for task in session.tasks:
+            try:
+                await asyncio.wait_for(asyncio.shield(task), timeout=15.0)
+            except (asyncio.TimeoutError, asyncio.CancelledError, Exception):
+                task.cancel()
+                try:
+                    await task
+                except (asyncio.CancelledError, Exception):
+                    pass
+
+        session.cancel_event.set()
         log.info("Session cleaned up")
 
 
