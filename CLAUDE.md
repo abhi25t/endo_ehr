@@ -2,15 +2,28 @@
 
 ## Project Overview
 
-A modular HTML prototype for an Endoscopy Electronic Health Record (EHR) system with hierarchical menus. Built for use on large desktop monitors with ample screen real estate. Uses Tailwind CSS for styling and vanilla JavaScript.
+A modular HTML prototype for an Endoscopy Electronic Health Record (EHR) system with hierarchical menus and **real-time voice dictation**. Built for use on large desktop monitors with ample screen real estate. Uses Tailwind CSS for styling, vanilla JavaScript for the frontend, and a Python (FastAPI) backend for voice-to-EHR automation.
+
+The app has two modes:
+- **Standalone mode**: Open `Endo_EHR.html` directly in browser (file://). Voice features disabled, EHR works as a manual click-based form.
+- **Voice mode**: Run `python server.py` → open `http://localhost:8000`. Enables real-time voice dictation via microphone → Google Cloud Speech-to-Text (Chirp3) → Gemini 2.5 Flash LLM → automatic EHR form filling.
 
 ## Tech Stack
 
-- **Modular JavaScript** — 18 source files in `src/js/`, built into a single distributable HTML
+### Frontend
+- **Modular JavaScript** — 19 source files in `src/js/`, built into a single distributable HTML
 - **Tailwind CSS** via CDN (`https://cdn.tailwindcss.com`)
 - **jsPDF** for PDF generation (`https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js`)
 - **File System Access API** for folder operations (Chrome/Edge)
+- **AudioWorklet** for 16kHz PCM audio capture (inline Blob URL, no external worklet file)
+- **WebSocket** client for real-time communication with backend
 - **Python build script** (`build.py`) — inlines JS modules into a single HTML for distribution
+
+### Backend (Voice Pipeline)
+- **FastAPI** + **Uvicorn** — serves frontend and WebSocket endpoint
+- **Google Cloud Speech-to-Text v2** (Chirp3 model) — streaming ASR with medical phrase hints
+- **Google Vertex AI Gemini 2.5 Flash** — LLM for transcript → EHR JSON updates
+- **Pydantic v2** — validates LLM output against EHR schema before sending to frontend
 
 ## File Structure
 
@@ -19,6 +32,18 @@ project/
 ├── build.py                    # Build script: src/ → Endo_EHR.html
 ├── Endo_EHR.html               # Built distributable (double-click to open)
 ├── EGD_Heirarchial_Menu_*.csv  # Disease/section definitions
+├── pipelines_figma.png         # Architecture diagram (voice pipeline design)
+│
+├── server.py                   # FastAPI backend: serves frontend + WebSocket voice endpoint
+├── asr_bridge.py               # Google Cloud STT v2 streaming bridge (async/thread)
+├── llm_caller.py               # Gemini 2.5 Flash: transcript → EHR JSON updates
+├── schema_builder.py           # CSV → EHR schema JSON + ASR phrase hints extraction
+├── models.py                   # Pydantic models for EHR report validation
+├── requirements.txt            # Python dependencies
+│
+├── stream_test_mic.py          # Test script: verify Google Cloud STT with local mic
+├── gemini_test.py              # Test script: verify Gemini API connectivity
+│
 ├── pictures/                   # Hint images referenced in CSV
 │   └── *.png, *.jpg, *.webp
 ├── retro_videos/               # Retrospective video analysis folder
@@ -45,15 +70,138 @@ project/
         ├── 15-pdf-generation.js     # generateTimestamp(), generatePDF()
         ├── 16-save-report.js        # Save and Clear button handlers
         ├── 17-csv-upload.js         # CSV file handler, sample loader, JSON file load handler
-        └── 18-init.js               # Init IIFE
+        ├── 18-init.js               # Init IIFE
+        └── 19-voice.js             # Voice dictation: audio capture, WebSocket, applyVoiceUpdate(), UI
 ```
 
 ## Development Workflow
 
+### Manual EHR (no voice)
 - **Edit** source files in `src/js/` and `src/Endo_EHR.html`
 - **Test during dev**: Open `src/Endo_EHR.html` directly in browser (works with file://)
 - **Build for distribution**: Run `python3 build.py` → produces `Endo_EHR.html` in project root
 - **Distribute**: Give users the built `Endo_EHR.html` — single file, double-click to open
+
+### Voice-Enabled Mode
+1. Install Python dependencies: `pip install -r requirements.txt`
+2. Set up Google Cloud credentials: `export GOOGLE_APPLICATION_CREDENTIALS=<your-key.json>`
+3. Start backend: `python server.py` (default port 8000, `--port N` for custom)
+4. Open `http://localhost:8000` in Chrome
+5. Load CSV → Click "Start Dictation" → speak into microphone
+6. Voice features require HTTP (not file://) due to `getUserMedia` secure context requirement
+
+## Voice Dictation Architecture
+
+```
+Browser (Chrome)                          Python Backend (FastAPI)
+================                          =======================
+
+Microphone
+  → AudioWorklet (16kHz PCM Int16)
+  → WebSocket binary frames ──────────→  WebSocket handler (/ws/voice)
+                                              │
+                                              ├─→ audio_queue (asyncio.Queue)
+                                              │       │
+                                              │       ▼
+                                              │   ASR Bridge (background thread)
+                                              │     Google Cloud STT v2 streaming
+                                              │     Chirp3 model, phrase hints
+                                              │       │
+                                              │       ▼ transcript results
+                                              │   transcript_queue (asyncio.Queue)
+                                              │       │
+                                              │       ▼
+                                              │   Transcript Batcher
+                                              │     (debounce 1.5s, accumulate finals)
+                                              │       │
+                                              │       ▼
+                                              │   LLM Caller
+                                              │     Gemini 2.5 Flash (single-shot)
+                                              │     schema + current_report + transcript
+                                              │       │
+                                              │       ▼ updated report JSON
+  ← WebSocket text frame ←───────────────────┘
+
+applyVoiceUpdate(report)
+  → report = newReport
+  → populateColumns()
+  → renderSubLocChips()
+  → renderReport()
+  → openDetails() (preserve active disease)
+```
+
+### Voice Pipeline Components
+
+| Component | File | Purpose |
+|-----------|------|---------|
+| WebSocket Server | `server.py` | FastAPI app, serves frontend, WebSocket lifecycle management |
+| Session State | `server.py:SessionState` | Per-connection state: queues, report, schema, pause flag |
+| Transcript Batcher | `server.py:transcript_batcher()` | Debounce 1.5s, accumulate finals, pre-LLM filtering |
+| ASR Bridge | `asr_bridge.py` | Async→sync queue bridge, STT thread, auto-restart on 5min timeout |
+| LLM Caller | `llm_caller.py` | Gemini prompt construction, response parsing, lazy init |
+| Schema Builder | `schema_builder.py` | CSV → canonical schema JSON + phrase hints for ASR |
+| Pydantic Models | `models.py` | EHRReport, DiseaseEntry, SectionEntry validation |
+| Frontend Voice | `src/js/19-voice.js` | Audio capture, WebSocket client, applyVoiceUpdate(), UI |
+
+### Voice Command Keywords (Pre-LLM Detection)
+
+| Command | Trigger Phrases | Action |
+|---------|----------------|--------|
+| Pause | "pause dictation", "stop recording", "pause" | Stop sending finals to LLM; ASR continues for display |
+| Resume | "resume dictation", "start recording", "resume" | Resume LLM pipeline |
+| Capture Photo | "capture photo", "take photo", "take picture" | Dummy stub (logs to console) |
+
+### Two-Layer Garbage Filtering
+
+1. **Pre-LLM (server.py)**: Skip transcripts with <2 meaningful words after removing filler ("um", "uh", "okay", etc.). Also intercepts voice commands before LLM.
+2. **LLM Prompt**: Instructs Gemini to ignore non-medical chatter, past-tense references to other patients, non-Latin script (Hindi/Telugu side conversations), and return report unchanged when in doubt.
+
+### WebSocket Protocol
+
+**Client → Server:**
+
+| Frame | Format | Purpose |
+|-------|--------|---------|
+| Text | `{"type":"init", "csv_text":"...", "report":{...}}` | Initialize session with CSV and current report |
+| Binary | Raw PCM Int16 bytes (16kHz mono) | Audio data from microphone |
+| Text | `{"type":"report_state", "report":{...}}` | Sync after manual UI edit |
+| Text | `{"type":"stop"}` | End dictation session |
+
+**Server → Client:**
+
+| Type | Fields | Purpose |
+|------|--------|---------|
+| `status` | `{asr, llm, paused}` | State indicators |
+| `interim_transcript` | `{text}` | Partial ASR result (display only, gray italic) |
+| `final_transcript` | `{text}` | Final ASR result (shown in black) |
+| `report_update` | `{report, overallRemarks}` | Updated report from LLM |
+| `capture_photo` | — | Photo capture command |
+| `error` | `{message}` | Error notification |
+| `info` | `{message}` | Informational (e.g., "ASR stream restarted") |
+
+### ASR Configuration
+
+- **Location**: `asia-southeast1`
+- **Model**: `chirp_3`
+- **Languages**: `["en-IN", "hi-IN", "te-IN"]`
+- **Sample rate**: 16kHz mono PCM Int16
+- **Phrase hints**: Extracted from CSV (medical jargon), max 500 per PhraseSet, boost=5.0
+- **Auto-restart**: On 5-minute STT stream timeout (OutOfRange exception)
+
+### LLM Configuration
+
+- **Location**: `us-central1`
+- **Model**: `gemini-2.5-flash`
+- **Temperature**: 0.1
+- **Max output tokens**: 8192
+- **Response format**: `application/json` (constrained decoding)
+- **Prompt strategy**: Single-shot with schema + current report state + transcript each call
+
+### Manual Edit Sync
+
+When the user makes manual edits while voice is active:
+- `voiceScheduleSync()` debounces (500ms) and sends `report_state` message to backend
+- Backend updates `session.current_report` so next LLM call uses fresh state
 
 ## Layout Structure
 
@@ -121,9 +269,9 @@ project/
 3. **Overall Remarks**
    - Text area at bottom (not included in disease reports)
 
-## Retrospective Video Analysis Controls
+## Retrospective Analysis & Voice Controls
 
-Located below the main heading:
+Located below the main heading in a single control bar:
 
 1. **Load Videos Folder** button - Opens folder picker
 2. **UHID Dropdown** - Shows patient folders with JSON count
@@ -138,7 +286,14 @@ Located below the main heading:
    - Duration (calculated: frames / 25 fps)
    - Segmentation Frame (integer)
 5. **PII Toggle** - Orange pill for marking PII content
-6. **CSV File Input** - Load disease definitions
+6. **Voice Dictation Toggle** - Green "Start Dictation" / Red "Stop Dictation" button
+   - Disabled when: no CSV loaded, file:// protocol, no getUserMedia
+   - Status indicator next to button: "Listening...", "AI Processing...", "Paused", "Disconnected"
+7. **Transcript Bar** - Below controls, hidden until dictation starts
+   - Partial transcripts in gray italic
+   - Final transcripts in black
+   - "PAUSED" in orange when voice paused
+8. **CSV File Input** - Load disease definitions (right-aligned)
 
 ## CSV Format
 
@@ -212,6 +367,15 @@ Format: `Subsection(Name=Value)` or `Section(Name=Value)`
 - Manual load via "Load Saved JSON" button
 - Restores: report data, frame inputs, PII state, last active disease
 
+### Voice Update (applyVoiceUpdate)
+- Lightweight version of `loadJsonFromText()` for real-time LLM updates
+- Does NOT touch `__retroMeta` (UHID, video, frames, PII stay unchanged during dictation)
+- Does NOT update `lastSavedReportState` (report remains "unsaved")
+- DOES validate disease names against loaded `DISEASES` object
+- DOES normalize sublocations (same logic as `loadJsonFromText()`)
+- DOES preserve currently active disease if it still exists in updated report
+- Calls `populateColumns()`, `renderSubLocChips()`, `renderReport()`, `openDetails()`
+
 ## Data Model
 
 ### Report Structure
@@ -259,6 +423,51 @@ Format: `Subsection(Name=Value)` or `Section(Name=Value)`
 }
 ```
 
+### EHR Schema (for LLM context, generated by schema_builder.py)
+```json
+{
+  "locations": ["Esophagus", "GE Junction", "Stomach", "Duodenum"],
+  "sublocations": {
+    "Esophagus": ["Cricopharynx", "Upper", "Middle", ...],
+    "Stomach": {
+      "Antrum": ["Lesser Curvature", ...],
+      "_standalone": ["Whole Stomach", ...]
+    }
+  },
+  "diseases": {
+    "Gastric Ulcer": {
+      "locations": ["Stomach"],
+      "default_sublocation": "",
+      "sections": {
+        "Number": { "multi": false, "attributes": ["Single", "Multiple (2-5)", ...] },
+        "Forrest Classification": { "multi": false, "attributes": [...] }
+      }
+    }
+  }
+}
+```
+
+### Pydantic Models (models.py)
+
+```
+EHRReport
+├── report: dict[str, LocationEntry]    # Keys: location names
+│   └── LocationEntry
+│       └── diseases: dict[str, DiseaseEntry]
+│           └── DiseaseEntry
+│               ├── sublocations: list[str]
+│               ├── sections: dict[str, SectionEntry]
+│               │   └── SectionEntry
+│               │       ├── attrs: dict[str, bool]
+│               │       ├── inputs: list[InputGroup]
+│               │       └── subsections: dict[str, SubsectionEntry]
+│               ├── comments: str
+│               └── startFrame/endFrame/segmentationFrame: Optional[int]
+└── overallRemarks: str
+```
+
+Validation pipeline: Parse JSON → Pydantic model_validate → strip invalid locations → validate disease names against schema → remove hallucinated diseases.
+
 ## CSS Classes
 
 ### Pills
@@ -293,6 +502,8 @@ logWarn(...args)  // Warnings
 logError(...args) // Errors
 ```
 
+Backend logging: Python `logging` module, logger name `"ehr-voice"`, level INFO.
+
 ### Key Functions
 
 | Function | Module | Purpose |
@@ -311,6 +522,15 @@ logError(...args) // Errors
 | `generatePDF()` | `15-pdf-generation` | Generate PDF from report data |
 | `updateFrameCalculations()` | `13-retro-video` | Calculate frame count and duration |
 | `hasUnsavedChanges()` | `13-retro-video` | Check if report differs from last save |
+| `applyVoiceUpdate(data)` | `19-voice` | Apply LLM-produced report update to UI |
+| `_voiceStart()` / `_voiceStop()` | `19-voice` | Start/stop dictation (audio + WebSocket) |
+| `voiceScheduleSync()` | `19-voice` | Debounced sync of manual edits to backend |
+| `build_schema(csv_text)` | `schema_builder` | CSV → canonical EHR schema dict |
+| `extract_phrase_hints(schema)` | `schema_builder` | Schema → medical jargon phrase list for ASR |
+| `call_llm(schema, report, remarks, transcript)` | `llm_caller` | Gemini call to update EHR from transcript |
+| `validate_llm_response(data, schema)` | `models` | Pydantic validation of LLM output |
+| `run_asr_bridge(ws, session)` | `asr_bridge` | Main ASR entry point (async task) |
+| `transcript_batcher(ws, session)` | `server` | Debounce + batch finals → LLM calls |
 
 ### Adding New Matrix Locations
 
@@ -326,15 +546,33 @@ logError(...args) // Errors
 
 ### Matrix Row Format
 ```javascript
-{ 
+{
   region: 'RegionName',      // First column text
   isHeading: false,          // true = text only, false = selectable pill
   options: ['Opt1', 'Opt2']  // Second column pills
 }
 ```
 
+### Running Test Scripts
+
+```bash
+# Test Google Cloud STT (requires mic + Google credentials)
+python stream_test_mic.py
+
+# Test Gemini API connectivity
+python gemini_test.py
+```
+
+### Schema Builder CLI
+
+```bash
+# Generate EHR schema + phrase hints from CSV
+python schema_builder.py EGD_Heirarchial_Menu-20260214.csv
+```
+
 ## Testing Checklist
 
+### Manual EHR
 - [ ] Load CSV file
 - [ ] Select disease from each location
 - [ ] Verify location-specific sections appear/hide correctly
@@ -347,3 +585,30 @@ logError(...args) // Errors
 - [ ] Test UHID change warning with unsaved data
 - [ ] Test Clear button resets everything
 - [ ] Verify PDF generation
+
+### Voice Dictation
+- [ ] `python server.py` → app loads at http://localhost:8000
+- [ ] Existing app works identically when served via FastAPI
+- [ ] Voice button disabled when no CSV loaded / when opened via file://
+- [ ] Voice button enabled after CSV load on HTTP
+- [ ] Click "Start Dictation" → mic permission prompt → "Listening..." status
+- [ ] Partial transcripts appear gray italic in transcript bar
+- [ ] Final transcripts appear in black
+- [ ] After ~2s debounce, "AI Processing..." appears
+- [ ] Report updates automatically from voice (diseases, sublocations, attributes)
+- [ ] Corrections work: "Correction, it's lesser curvature" overrides previous
+- [ ] "Remove [disease]" removes it from report
+- [ ] "Pause dictation" → shows PAUSED, stops LLM calls, ASR still runs
+- [ ] "Resume dictation" → resumes LLM pipeline
+- [ ] "Capture photo" → toast notification (stub)
+- [ ] Click "Stop Dictation" → mic releases, button returns to green
+- [ ] Manual pill clicks during voice session sync to backend
+- [ ] Save button works normally with voice-entered data
+
+## Future Features (Not Yet Implemented)
+
+1. **Create Sentences Report**: Gemini generates natural language narrative from structured EHR JSON
+2. **Upload to DB**: Backend API to push finalized reports to a database
+3. **Photo Captioning Mode**: Voice input for photo captions instead of EHR fields
+4. **Load Saved JSON by Voice**: "Load previous report" voice command
+5. **Per-disease Schema Filtering**: Send only relevant disease schema to LLM (cost optimization)
