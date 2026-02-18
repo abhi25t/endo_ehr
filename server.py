@@ -61,6 +61,37 @@ app.mount("/js", StaticFiles(directory=SRC_DIR / "js"), name="js")
 app.mount("/pictures", StaticFiles(directory=PROJECT_DIR / "pictures"), name="pictures")
 
 
+# ── Sentences Report API ──
+
+from fastapi import Request
+from fastapi.responses import JSONResponse
+
+
+@app.post("/api/generate-report")
+async def api_generate_report(request: Request):
+    """Generate a natural-language sentences report from structured EHR JSON."""
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse(status_code=400, content={"error": "Invalid JSON body"})
+
+    report_data = body.get("report_data")
+    if not report_data or not isinstance(report_data, dict):
+        return JSONResponse(status_code=400, content={"error": "Missing or invalid 'report_data'"})
+
+    try:
+        from llm_caller import generate_sentences_report
+        result = await generate_sentences_report(report_data)
+        if result is None:
+            return JSONResponse(status_code=500, content={"error": "LLM returned empty response"})
+        return JSONResponse(content={"html": result})
+    except ImportError:
+        return JSONResponse(status_code=500, content={"error": "LLM module not available"})
+    except Exception as e:
+        log.exception("generate-report endpoint error")
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+
 # ── Session state per WebSocket connection ──
 
 FILLER_WORDS = {"um", "uh", "ah", "okay", "ok", "so", "like", "yeah", "yes", "hmm", "hm"}

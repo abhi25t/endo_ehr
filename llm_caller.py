@@ -187,3 +187,70 @@ async def call_llm(
     except Exception as e:
         log.exception("LLM call failed")
         raise
+
+
+# ── Sentences Report ──
+
+SENTENCES_REPORT_PROMPT = """\
+You are an expert endoscopy report writer. You will receive structured JSON data \
+from a hospital's endoscopy EHR system.
+
+Convert it into crisp, typical sentences using the standard jargon of an \
+endoscopy report. Use words which doctors typically use such as "suspected", \
+"noted", "seen", "revealed", "appeared", "suggestive of", etc.
+
+RULES:
+- Do NOT use bullet points. Use sentences only.
+- Use appropriate headings for locations, organs, and diseases.
+- Group findings by anatomical location.
+- Be concise but medically precise.
+- Include all sublocations, attributes, and relevant details from the JSON.
+- If overall remarks exist, include them at the end.
+
+FORMAT your output as HTML:
+- <h2> for anatomical locations (Esophagus, GE Junction, Stomach, Duodenum)
+- <h3> for disease/finding names
+- <p> for descriptive sentences
+- Use <strong> for emphasis on key findings
+- Use <em> for qualifiers like "suspected", "possible"
+- Do NOT wrap in ```html code fences. Return raw HTML only.
+"""
+
+
+async def generate_sentences_report(report_json: dict) -> str | None:
+    """
+    Call Gemini to convert structured EHR JSON into natural language sentences.
+
+    Args:
+        report_json: The report data (report, overallRemarks, optionally __retroMeta)
+
+    Returns:
+        HTML string with formatted sentences report, or None on failure.
+    """
+    model = _get_model()
+
+    user_prompt = json.dumps(report_json, indent=2, ensure_ascii=False)
+
+    generation_config = GenerationConfig(
+        temperature=0.3,
+        max_output_tokens=8192,
+    )
+
+    log.info("Sentences report LLM call: %d chars input", len(user_prompt))
+
+    try:
+        response = await model.generate_content_async(
+            [SENTENCES_REPORT_PROMPT, user_prompt],
+            generation_config=generation_config,
+        )
+
+        if not response.text:
+            log.warning("Sentences report: LLM returned empty response")
+            return None
+
+        log.info("Sentences report generated: %d chars", len(response.text))
+        return response.text
+
+    except Exception:
+        log.exception("Sentences report LLM call failed")
+        raise

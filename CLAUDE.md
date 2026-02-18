@@ -13,7 +13,9 @@ The app has two modes:
 ### Frontend
 - **Modular JavaScript** — 19 source files in `src/js/`, built into a single distributable HTML
 - **Tailwind CSS** via CDN (`https://cdn.tailwindcss.com`)
-- **jsPDF** for PDF generation (`https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js`)
+- **jsPDF** for structured PDF generation (`https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js`)
+- **Quill.js** rich text editor for sentences report (`https://cdn.quilljs.com/1.3.7/quill.min.js`)
+- **html2pdf.js** for sentences report PDF (`https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js`)
 - **File System Access API** for folder operations (Chrome/Edge)
 - **AudioWorklet** for 16kHz PCM audio capture (inline Blob URL, no external worklet file)
 - **WebSocket** client for real-time communication with backend
@@ -72,7 +74,8 @@ project/
         ├── 16-save-report.js        # Save and Clear button handlers
         ├── 17-csv-upload.js         # CSV file handler (stores loadedCsvText), sample loader, JSON file load
         ├── 18-init.js               # Init IIFE
-        └── 19-voice.js             # Voice dictation: audio capture, WebSocket, applyVoiceUpdate(), UI
+        ├── 19-voice.js             # Voice dictation: audio capture, WebSocket, applyVoiceUpdate(), UI
+        └── 20-sentences-report.js  # Sentences report: Gemini → Quill rich text editor → PDF via html2pdf.js
 ```
 
 ## Development Workflow
@@ -542,6 +545,9 @@ Backend logging: Python `logging` module, logger name `"ehr-voice"`, level INFO.
 | `validate_llm_response(data, schema)` | `models` | Pydantic validation of LLM output |
 | `run_asr_bridge(ws, session)` | `asr_bridge` | Main ASR entry point (async task) |
 | `transcript_batcher(ws, session)` | `server` | Debounce + batch finals → LLM calls |
+| `generate_sentences_report(json)` | `llm_caller` | Gemini call to convert EHR JSON → prose HTML |
+| `_sentencesGenerate()` | `20-sentences-report` | Main handler: modal + API call + Quill init |
+| `_sentencesGeneratePdf()` | `20-sentences-report` | html2pdf.js PDF generation from Quill content |
 
 ### Adding New Matrix Locations
 
@@ -624,10 +630,31 @@ python schema_builder.py EGD_Heirarchial_Menu-20260214.csv
 - [ ] Manual pill clicks during voice session sync to backend
 - [ ] Save button works normally with voice-entered data
 
+### Sentences Report
+- [ ] Button visible below Overall Remarks
+- [ ] Click with empty report → alert, no modal
+- [ ] Click with findings → modal opens with loading spinner
+- [ ] Gemini generates prose → Quill editor appears with formatted text
+- [ ] Toolbar works: bold, italic, underline, headings, lists
+- [ ] Text is editable in Quill editor
+- [ ] "Submit and Create PDF Report" → PDF downloads
+- [ ] PDF has title, formatted content, readable layout
+- [ ] Modal closes via X button, ESC key, or backdrop click
+
+### Sentences Report
+
+Converts structured EHR JSON into natural-language prose via Gemini, displayed in a Quill.js rich text editor:
+
+1. Doctor clicks **"Generate Sentences Report"** button (below Overall Remarks)
+2. Modal opens with loading spinner → `POST /api/generate-report` calls Gemini
+3. Gemini returns HTML with `<h2>` locations, `<h3>` diseases, `<p>` sentences
+4. Quill.js editor loads the HTML with Gmail-style toolbar (bold, italic, underline, headings, lists)
+5. Doctor reviews/edits → clicks **"Submit and Create PDF Report"** → html2pdf.js generates A4 PDF
+6. Requires server mode (not available in file:// mode)
+
 ## Future Features (Not Yet Implemented)
 
-1. **Create Sentences Report**: Gemini generates natural language narrative from structured EHR JSON
-2. **Upload to DB**: Backend API to push finalized reports to a database
+1. **Upload to DB**: Backend API to push finalized reports to a database
 3. **Photo Captioning Mode**: Voice input for photo captions instead of EHR fields
 4. **Load Saved JSON by Voice**: "Load previous report" voice command
 5. **Per-disease Schema Filtering**: Send only relevant disease schema to LLM (cost optimization)
