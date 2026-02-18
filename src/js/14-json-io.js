@@ -7,6 +7,38 @@ function loadJsonFromText(text, filename, restoreUhidVideo) {
     if (typeof parsedAll !== "object" || parsedAll === null)
       throw new Error("Invalid JSON structure");
 
+    // Handle prospective metadata
+    if (parsedAll.__prospMeta) {
+      const meta = parsedAll.__prospMeta;
+      log('Found prospective metadata:', meta);
+
+      // Switch to prospective mode if needed
+      if (studyType !== 'prospective' && typeof applyStudyType === 'function') {
+        applyStudyType('prospective');
+      }
+
+      // Populate prospective fields
+      prospectivePatient = {
+        uhid: meta.uhid || '',
+        patientName: meta.patientName || '',
+        gender: meta.gender || '',
+        age: meta.age || '',
+        indication: meta.indication || ''
+      };
+
+      const fieldMap = {
+        uhid: 'prospUhid',
+        patientName: 'prospPatientName',
+        gender: 'prospGender',
+        age: 'prospAge',
+        indication: 'prospIndication'
+      };
+      Object.entries(fieldMap).forEach(([key, elId]) => {
+        const el = document.getElementById(elId);
+        if (el) el.value = prospectivePatient[key];
+      });
+    }
+
     // Handle retrospective metadata
     if (parsedAll.__retroMeta) {
       const retroMeta = parsedAll.__retroMeta;
@@ -94,6 +126,7 @@ function loadJsonFromText(text, filename, restoreUhidVideo) {
     } else {
       const tempReport = {...parsedAll};
       delete tempReport.__retroMeta;
+      delete tempReport.__prospMeta;
       delete tempReport.__meta;
       delete tempReport.overallRemarks;
       report = tempReport;

@@ -6,6 +6,9 @@
   <title>AIG Endoscopy Report</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet">
+  <script src="https://cdn.quilljs.com/1.3.7/quill.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <style>
     body { font-family: Inter, system-ui, sans-serif; }
     .loc-column { min-height: 320px; max-height: 420px; overflow:auto; }
@@ -27,18 +30,121 @@
     .left-disease.selected {
       background:#2563eb; color:#fff; border-color:#1e40af;
     }
+    #sentencesEditor h1 { font-size: 2em; font-weight: bold; }
+    #sentencesEditor h2 { font-size: 1.5em; font-weight: bold; margin-top: 0.5em; }
+    #sentencesEditor h3 { font-size: 1.17em; font-weight: bold; margin-top: 0.3em; }
+    #sentencesEditor p { margin-bottom: 0.5em; }
+
+    /* Portrait mode: greyed-out elements */
+    .left-disease.portrait-greyed, .pill.portrait-greyed {
+      opacity: 0.35; cursor: not-allowed;
+    }
+    /* Portrait mode: focused disease (selected but not yet added to report) */
+    .left-disease.portrait-focused {
+      border-color: #3b82f6; background: #eff6ff;
+    }
+
+    /* Settings toggle switch */
+    .toggle-switch { width: 2.75rem; height: 1.5rem; border-radius: 9999px; position: relative; cursor: pointer; transition: background-color 0.2s; }
+    .toggle-knob { position: absolute; top: 2px; left: 2px; width: 1.15rem; height: 1.15rem; border-radius: 9999px; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.2); transition: transform 0.2s; }
+    .toggle-switch.active .toggle-knob { transform: translateX(1.25rem); }
+
+    /* ── Dark mode overrides ── */
+    body.dark { background-color: #111827 !important; color: #f3f4f6 !important; }
+    body.dark .bg-white { background-color: #1f2937 !important; }
+    body.dark .bg-gray-100 { background-color: #111827 !important; }
+    body.dark .bg-gray-50 { background-color: #374151 !important; }
+    body.dark .bg-blue-50 { background-color: #1e3a5f !important; }
+    body.dark .text-gray-800 { color: #f3f4f6 !important; }
+    body.dark .text-gray-700 { color: #d1d5db !important; }
+    body.dark .text-gray-600 { color: #d1d5db !important; }
+    body.dark .text-gray-500 { color: #9ca3af !important; }
+    body.dark .text-gray-400 { color: #9ca3af !important; }
+    body.dark .text-blue-700 { color: #60a5fa !important; }
+    body.dark .text-blue-600 { color: #60a5fa !important; }
+    body.dark .text-yellow-700 { color: #fbbf24 !important; }
+    body.dark .border { border-color: #4b5563 !important; }
+    body.dark .border-gray-200 { border-color: #4b5563 !important; }
+    body.dark .border-blue-200 { border-color: #2563eb !important; }
+    body.dark .shadow { box-shadow: 0 1px 3px 0 rgba(0,0,0,0.4) !important; }
+    body.dark input, body.dark textarea, body.dark select {
+      background-color: #374151 !important; color: #f3f4f6 !important; border-color: #6b7280 !important;
+    }
+    body.dark .pill, body.dark .attr-pill {
+      background: #374151; color: #93c5fd; border-color: #3b82f6;
+    }
+    body.dark .pill:hover, body.dark .attr-pill:hover { background: #4b5563; }
+    body.dark .pill-selected, body.dark .attr-pill.selected {
+      background: #2563eb; color: #fff; border-color: #3b82f6;
+    }
+    body.dark .left-disease {
+      background: #374151; color: #f3f4f6;
+    }
+    body.dark .left-disease:hover { background: #4b5563; }
+    body.dark .left-disease.portrait-focused { border-color: #3b82f6; background: #1e3a5f; }
+    body.dark .left-disease.selected {
+      background: #2563eb; color: #fff; border-color: #3b82f6;
+    }
+    body.dark .hover\:bg-gray-200:hover { background-color: #4b5563 !important; }
+    body.dark .ql-toolbar { background-color: #1f2937 !important; border-color: #4b5563 !important; }
+    body.dark .ql-toolbar .ql-stroke { stroke: #d1d5db !important; }
+    body.dark .ql-toolbar .ql-fill { fill: #d1d5db !important; }
+    body.dark .ql-toolbar .ql-picker-label { color: #d1d5db !important; }
+    body.dark .ql-container { background-color: #1f2937 !important; border-color: #4b5563 !important; color: #f3f4f6 !important; }
   </style>
 </head>
 <body class="bg-gray-100 text-gray-800">
-<div class="max-w-full mx-auto p-6">
+<div class="max-w-full mx-auto p-6 relative">
   <h1 class="text-2xl font-bold text-center text-blue-700 mb-6">AIG Endoscopy Report</h1>
 
-  <!-- Retrospective Analysis Controls -->
-  <div class="mb-3 bg-white p-4 rounded shadow">
+  <!-- Settings Gear Button -->
+  <div class="absolute top-6 right-6 z-50">
+    <button id="settingsGearBtn" class="p-2 rounded-full hover:bg-gray-200 text-gray-600 text-xl" title="Settings">
+      &#9881;
+    </button>
+    <div id="settingsPanel" class="hidden absolute right-0 mt-2 w-72 bg-white rounded-lg shadow-lg border p-4 z-50">
+      <!-- Dark Mode Toggle -->
+      <div class="flex items-center justify-between mb-4 pb-3 border-b">
+        <label class="text-sm font-medium text-gray-700 flex items-center gap-2">
+          <span class="text-lg">&#9790;</span> Dark Mode
+        </label>
+        <div id="darkModeToggle" class="toggle-switch bg-gray-300">
+          <div class="toggle-knob"></div>
+        </div>
+      </div>
+      <!-- Study Type -->
+      <div class="mb-4 pb-3 border-b">
+        <div class="text-sm font-medium text-gray-700 mb-2">Study Type</div>
+        <div class="flex gap-4">
+          <label class="flex items-center gap-1.5 text-sm cursor-pointer">
+            <input type="radio" name="studyType" value="retrospective" checked class="accent-blue-600" /> Retrospective
+          </label>
+          <label class="flex items-center gap-1.5 text-sm cursor-pointer">
+            <input type="radio" name="studyType" value="prospective" class="accent-blue-600" /> Prospective
+          </label>
+        </div>
+      </div>
+      <!-- Display Mode -->
+      <div>
+        <div class="text-sm font-medium text-gray-700 mb-2">Display Mode</div>
+        <div class="flex gap-4">
+          <label class="flex items-center gap-1.5 text-sm cursor-pointer">
+            <input type="radio" name="displayMode" value="landscape" checked class="accent-blue-600" /> Landscape
+          </label>
+          <label class="flex items-center gap-1.5 text-sm cursor-pointer">
+            <input type="radio" name="displayMode" value="portrait" class="accent-blue-600" /> Portrait
+          </label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Retrospective Controls -->
+  <div id="retroControls" class="mb-3 bg-white p-4 rounded shadow">
     <div class="flex items-center gap-6 flex-wrap">
       <!-- Load Videos Folder Button -->
       <button id="loadVideoFolder" class="bg-purple-600 text-white px-3 py-2 rounded text-sm hover:bg-purple-700">
-        📁 Load Videos Folder
+        Load Videos Folder
       </button>
 
       <!-- UHID Dropdown -->
@@ -84,7 +190,38 @@
       <button id="piiToggle" class="px-3 py-2 rounded text-sm border-2 border-orange-400 bg-white text-orange-600 hover:bg-orange-50">
         PII
       </button>
+    </div>
+  </div>
 
+  <!-- Prospective Controls (hidden by default) -->
+  <div id="prospControls" class="mb-3 bg-white p-4 rounded shadow hidden">
+    <div class="flex items-center gap-6 flex-wrap">
+      <div class="flex items-center gap-2">
+        <label class="text-sm font-medium text-gray-700">UHID:</label>
+        <input type="text" id="prospUhid" class="border rounded p-2 text-sm w-32" placeholder="UHID" />
+      </div>
+      <div class="flex items-center gap-2">
+        <label class="text-sm font-medium text-gray-700">Patient Name:</label>
+        <input type="text" id="prospPatientName" class="border rounded p-2 text-sm w-48" placeholder="Name" />
+      </div>
+      <div class="flex items-center gap-2">
+        <label class="text-sm font-medium text-gray-700">Gender:</label>
+        <input type="text" id="prospGender" class="border rounded p-2 text-sm w-24" placeholder="M/F" />
+      </div>
+      <div class="flex items-center gap-2">
+        <label class="text-sm font-medium text-gray-700">Age:</label>
+        <input type="text" id="prospAge" class="border rounded p-2 text-sm w-20" placeholder="Age" />
+      </div>
+      <div class="flex items-center gap-2">
+        <label class="text-sm font-medium text-gray-700">Indication:</label>
+        <input type="text" id="prospIndication" class="border rounded p-2 text-sm w-64" placeholder="Indication for procedure" />
+      </div>
+    </div>
+  </div>
+
+  <!-- Shared Controls (Voice + CSV) - always visible -->
+  <div id="sharedControls" class="mb-3 bg-white p-4 rounded shadow">
+    <div class="flex items-center gap-6 flex-wrap">
       <!-- Voice Dictation Toggle -->
       <button id="voiceToggle" disabled
         class="bg-green-600 text-white px-4 py-2 rounded text-sm hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -93,7 +230,7 @@
       </button>
       <span id="voiceStatus" class="text-sm text-gray-500"></span>
 
-      <!-- CSV Loading (moved to right side) -->
+      <!-- CSV Loading (right side) -->
       <div class="flex items-center gap-2 ml-auto">
         <input id="csvFile" type="file" accept=".csv" class="text-sm" />
         <button id="loadSample" class="px-3 py-1 rounded border text-sm bg-white hover:bg-gray-50">Load sample</button>
@@ -107,11 +244,11 @@
     </div>
   </div>
 
-  <div class="flex gap-6">
+  <div id="mainLayout" class="flex gap-6">
     <!-- LEFT -->
-    <div class="w-3/4 space-y-4">
-      <div class="bg-white p-4 rounded shadow">
-        <div class="grid grid-cols-4 gap-4">
+    <div id="leftPane" class="w-3/4 space-y-4">
+      <div id="diseaseGridCard" class="bg-white p-4 rounded shadow">
+        <div id="diseaseColumnsGrid" class="grid grid-cols-4 gap-4">
           <div>
             <h3 class="text-blue-600 font-semibold mb-2">Esophagus</h3>
             <div id="col-esophagus" class="loc-column space-y-2"></div>
@@ -129,7 +266,7 @@
             <div id="col-duodenum" class="loc-column space-y-2"></div>
           </div>
         </div>
-        <div class="mt-4 bg-blue-50 p-4 rounded">
+        <div id="sublocSection" class="mt-4 bg-blue-50 p-4 rounded">
           <div class="font-medium mb-2 text-sm text-gray-700">
             Sub-Location <span class="text-xs italic text-gray-500">(multi-select)</span>
           </div>
@@ -144,7 +281,7 @@
         </div>
 
         <!-- Disease-specific Frame Controls -->
-        <div class="mb-4 p-3 bg-blue-50 rounded border border-blue-200">
+        <div id="diseaseFrameBar" class="mb-4 p-3 bg-blue-50 rounded border border-blue-200">
           <div class="flex items-center gap-4 flex-wrap">
             <div class="flex items-center gap-2">
               <label class="text-sm font-medium text-gray-700">Start Frame:</label>
@@ -174,7 +311,7 @@
     </div>
 
     <!-- RIGHT -->
-    <div class="w-1/4">
+    <div id="rightPane" class="w-1/4">
       <div class="bg-white p-4 rounded shadow">
         <div class="flex justify-between items-center mb-3">
           <h2 class="text-lg font-semibold">Report</h2>
@@ -189,6 +326,12 @@
       <div class="bg-white mt-4 p-4 rounded shadow">
         <label class="block font-medium mb-1">Overall Remarks</label>
         <textarea id="overallRemarks" rows="4" class="w-full p-2 border rounded" placeholder="Overall remarks"></textarea>
+      </div>
+      <div class="mt-4">
+        <button id="generateSentencesReport"
+          class="w-full bg-indigo-600 text-white px-4 py-3 rounded text-sm font-semibold hover:bg-indigo-700">
+          Generate Sentences Report
+        </button>
       </div>
     </div>
   </div>
@@ -549,8 +692,16 @@ let retroData = {
 
 let piiEnabled = false;
 let loadedCsvFilename = null;
+let loadedCsvText = null;
 let lastSavedReportState = null;
 let previousUhidSelection = '';
+
+/* ---------- settings state ---------- */
+let darkMode = false;
+let studyType = 'retrospective';    // 'retrospective' | 'prospective'
+let displayMode = 'landscape';       // 'landscape' | 'portrait'
+let prospectivePatient = { uhid: '', patientName: '', gender: '', age: '', indication: '' };
+let portraitSelectedDisease = null;   // disease name focused in portrait mode (before location chosen)
 
 /* ---------- conditional logic ---------- */
 // Evaluate a single condition with section context for proper subsection matching
@@ -647,6 +798,8 @@ function evaluateConditional(cond, sectionContext){
 
 /* ---------- Left columns (diseases) ---------- */
 function populateColumns(){
+  if (displayMode === 'portrait') { populateColumnsPortrait(); return; }
+
   ["col-esophagus","col-gejunction","col-stomach","col-duodenum"].forEach(id => {
     document.getElementById(id).innerHTML = "";
   });
@@ -679,12 +832,111 @@ function populateColumns(){
 }
 
 function refreshLeftHighlights(){
+  if (displayMode === 'portrait') { refreshPortraitHighlights(); return; }
+
   document.querySelectorAll(".left-disease").forEach(btn => {
     const loc = btn.dataset.loc;
     const dn  = btn.dataset.disease;
     const inReport = !!(report[loc] && report[loc].diseases && report[loc].diseases[dn]);
     const isActive = !!(active && active.loc === loc && active.disease === dn);
     btn.classList.toggle("selected", inReport || isActive);
+  });
+}
+
+/* ---------- Portrait mode: single-column disease list ---------- */
+
+function populateColumnsPortrait(){
+  const leftPane = document.getElementById('leftPane');
+  if (!leftPane) return;
+
+  // Get or create the portrait disease list container
+  let list = document.getElementById('portraitDiseaseList');
+  if (!list) {
+    list = document.createElement('div');
+    list.id = 'portraitDiseaseList';
+    list.className = 'bg-white p-3 rounded shadow space-y-1 overflow-y-auto';
+    list.style.maxHeight = '85vh';
+    leftPane.insertBefore(list, leftPane.firstChild);
+  }
+  list.innerHTML = '';
+
+  // Deduplicate: show each disease once
+  const seen = new Set();
+  Object.keys(DISEASES).forEach(name => {
+    if (seen.has(name)) return;
+    seen.add(name);
+
+    const def = DISEASES[name];
+    const locs = Object.keys(def.locations);
+
+    const btn = document.createElement('button');
+    btn.className = 'left-disease text-sm';
+    btn.textContent = name;
+    btn.dataset.disease = name;
+    btn.dataset.locs = JSON.stringify(locs);
+
+    // Highlight if in report
+    const inReport = locs.some(l =>
+      report[l] && report[l].diseases && report[l].diseases[name]
+    );
+    const isActive = !!(active && locs.includes(active.loc) && active.disease === name);
+    if (inReport || isActive) btn.classList.add('selected');
+
+    // Focus ring if this is the portrait-focused disease (not yet in report)
+    if (portraitSelectedDisease === name && !inReport) {
+      btn.classList.add('portrait-focused');
+    }
+
+    btn.onclick = () => {
+      portraitSelectedDisease = name;
+
+      // If disease is already in report, open existing instance
+      const existingLoc = locs.find(l =>
+        report[l] && report[l].diseases && report[l].diseases[name]
+      );
+      if (existingLoc) {
+        selectedMainLoc = existingLoc;
+        openDetails(existingLoc, name);
+        renderSubLocChips();
+        refreshPortraitHighlights();
+        if (typeof updatePortraitLocationPills === 'function') updatePortraitLocationPills();
+        return;
+      }
+
+      // Single-location disease: auto-add immediately
+      if (locs.length === 1) {
+        selectedMainLoc = locs[0];
+        addOrOpenDisease(locs[0], name);
+        renderSubLocChips();
+        refreshPortraitHighlights();
+        if (typeof updatePortraitLocationPills === 'function') updatePortraitLocationPills();
+        return;
+      }
+
+      // Multi-location disease: just focus it, update location pills, wait for pill click
+      refreshPortraitHighlights();
+      if (typeof updatePortraitLocationPills === 'function') updatePortraitLocationPills();
+    };
+
+    list.appendChild(btn);
+  });
+}
+
+function refreshPortraitHighlights(){
+  const buttons = document.querySelectorAll('#portraitDiseaseList .left-disease');
+  buttons.forEach(btn => {
+    const name = btn.dataset.disease;
+    const locs = JSON.parse(btn.dataset.locs || '[]');
+
+    const inReport = locs.some(l =>
+      report[l] && report[l].diseases && report[l].diseases[name]
+    );
+    const isActive = !!(active && locs.includes(active.loc) && active.disease === name);
+    btn.classList.toggle('selected', inReport || isActive);
+
+    // Focus ring for the currently focused disease (not yet in report)
+    btn.classList.toggle('portrait-focused',
+      portraitSelectedDisease === name && !inReport && !isActive);
   });
 }
 
@@ -1558,6 +1810,7 @@ function renderReport(){
   });
 
   refreshLeftHighlights();
+  if (typeof voiceScheduleSync === "function") voiceScheduleSync();
 }
 
 /* ---------- Retrospective Video Analysis ---------- */
@@ -1927,6 +2180,38 @@ function loadJsonFromText(text, filename, restoreUhidVideo) {
     if (typeof parsedAll !== "object" || parsedAll === null)
       throw new Error("Invalid JSON structure");
 
+    // Handle prospective metadata
+    if (parsedAll.__prospMeta) {
+      const meta = parsedAll.__prospMeta;
+      log('Found prospective metadata:', meta);
+
+      // Switch to prospective mode if needed
+      if (studyType !== 'prospective' && typeof applyStudyType === 'function') {
+        applyStudyType('prospective');
+      }
+
+      // Populate prospective fields
+      prospectivePatient = {
+        uhid: meta.uhid || '',
+        patientName: meta.patientName || '',
+        gender: meta.gender || '',
+        age: meta.age || '',
+        indication: meta.indication || ''
+      };
+
+      const fieldMap = {
+        uhid: 'prospUhid',
+        patientName: 'prospPatientName',
+        gender: 'prospGender',
+        age: 'prospAge',
+        indication: 'prospIndication'
+      };
+      Object.entries(fieldMap).forEach(([key, elId]) => {
+        const el = document.getElementById(elId);
+        if (el) el.value = prospectivePatient[key];
+      });
+    }
+
     // Handle retrospective metadata
     if (parsedAll.__retroMeta) {
       const retroMeta = parsedAll.__retroMeta;
@@ -2014,6 +2299,7 @@ function loadJsonFromText(text, filename, restoreUhidVideo) {
     } else {
       const tempReport = {...parsedAll};
       delete tempReport.__retroMeta;
+      delete tempReport.__prospMeta;
       delete tempReport.__meta;
       delete tempReport.overallRemarks;
       report = tempReport;
@@ -2165,6 +2451,25 @@ function generatePDF(data, filename) {
     yPos += 4;
   }
 
+  // Prospective metadata
+  if (data.__prospMeta) {
+    const meta = data.__prospMeta;
+    addLine();
+    addText('Patient Information', 12, true);
+    yPos += 2;
+    if (meta.uhid) addText(`UHID: ${meta.uhid}`, 10, false, 5);
+    if (meta.patientName) addText(`Patient Name: ${meta.patientName}`, 10, false, 5);
+    if (meta.gender) addText(`Gender: ${meta.gender}`, 10, false, 5);
+    if (meta.age) addText(`Age: ${meta.age}`, 10, false, 5);
+    if (meta.indication) addText(`Indication: ${meta.indication}`, 10, false, 5);
+    if (meta.csvFile) addText(`CSV File: ${meta.csvFile}`, 10, false, 5);
+    if (meta.savedAt) {
+      const savedDate = new Date(meta.savedAt).toLocaleString();
+      addText(`Saved: ${savedDate}`, 10, false, 5);
+    }
+    yPos += 4;
+  }
+
   // Report content
   const reportData = data.report || {};
 
@@ -2299,81 +2604,114 @@ document.getElementById("clearReport").onclick = () => {
   report = {};
   active = null;
   document.getElementById("detailsCard").classList.add("hidden");
-  document.getElementById("startFrame").value = "";
-  document.getElementById("endFrame").value = "";
-  document.getElementById("segmentationFrame").value = "";
   document.getElementById("overallRemarks").value = "";
 
-  // Also clear UHID and Video selections
-  document.getElementById("uhidSelect").value = "";
-  document.getElementById("videoSelect").innerHTML = '<option value="">-- Select Video --</option>';
-  document.getElementById("videoSelect").disabled = true;
-  previousUhidSelection = ""; // Reset the previous selection tracker
+  if (studyType === 'prospective') {
+    // Clear prospective fields
+    ['prospUhid', 'prospPatientName', 'prospGender', 'prospAge', 'prospIndication'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = '';
+    });
+    prospectivePatient = { uhid: '', patientName: '', gender: '', age: '', indication: '' };
+  } else {
+    // Clear retrospective fields
+    document.getElementById("startFrame").value = "";
+    document.getElementById("endFrame").value = "";
+    document.getElementById("segmentationFrame").value = "";
+    document.getElementById("uhidSelect").value = "";
+    document.getElementById("videoSelect").innerHTML = '<option value="">-- Select Video --</option>';
+    document.getElementById("videoSelect").disabled = true;
+    previousUhidSelection = "";
+    piiEnabled = false;
+    updatePiiButtonState();
+    updateFrameCalculations();
+  }
 
   // Reset saved state since report is now empty
   lastSavedReportState = JSON.stringify(report);
 
-  // Reset PII state
-  piiEnabled = false;
-  updatePiiButtonState();
-
-  updateFrameCalculations();
   renderReport();
   populateColumns();
   renderSubLocChips();
   document.getElementById("csvNote").textContent = "Report cleared.";
 };
 
-// Save JSON and PDF with retrospective data
+// Save JSON and PDF with retrospective or prospective data
 document.getElementById("saveJSON").onclick = async () => {
-  const uhid = document.getElementById('uhidSelect').value;
-  const video = document.getElementById('videoSelect').value;
-  const startFrame = document.getElementById('startFrame').value;
-  const endFrame = document.getElementById('endFrame').value;
-  const segmentationFrame = document.getElementById('segmentationFrame').value;
+  let out;
+  let uhid;
 
-  // Check for missing required fields and warn user
-  const missingFields = [];
-  if (!video) missingFields.push('Video');
-  if (!startFrame) missingFields.push('Start Frame');
-  if (!endFrame) missingFields.push('End Frame');
+  if (studyType === 'prospective') {
+    // Prospective: use text field inputs
+    uhid = prospectivePatient.uhid || '';
 
-  // Check for invalid frame range (end < start)
-  const startFrameNum = parseInt(startFrame, 10) || 0;
-  const endFrameNum = parseInt(endFrame, 10) || 0;
-  const hasFrameInput = startFrameNum > 0 || endFrameNum > 0;
-  const isInvalidFrameRange = hasFrameInput && (endFrameNum < startFrameNum);
+    out = {
+      __prospMeta: {
+        uhid: uhid || null,
+        patientName: prospectivePatient.patientName || null,
+        gender: prospectivePatient.gender || null,
+        age: prospectivePatient.age || null,
+        indication: prospectivePatient.indication || null,
+        csvFile: loadedCsvFilename || null,
+        savedAt: new Date().toISOString()
+      },
+      __meta: active ? { lastActive: active } : null,
+      report: JSON.parse(JSON.stringify(report || {})),
+      overallRemarks: document.getElementById('overallRemarks').value || ""
+    };
 
-  if (isInvalidFrameRange) {
-    const proceed = confirm(`Warning: Invalid frame range detected!\nEnd Frame (${endFrameNum}) is less than Start Frame (${startFrameNum}).\n\nDo you still want to save?`);
-    if (!proceed) {
-      return; // User cancelled
+    log('Saving report with prospective metadata:', out.__prospMeta);
+
+  } else {
+    // Retrospective: existing logic
+    uhid = document.getElementById('uhidSelect').value;
+    const video = document.getElementById('videoSelect').value;
+    const startFrame = document.getElementById('startFrame').value;
+    const endFrame = document.getElementById('endFrame').value;
+    const segmentationFrame = document.getElementById('segmentationFrame').value;
+
+    // Check for missing required fields and warn user
+    const missingFields = [];
+    if (!video) missingFields.push('Video');
+    if (!startFrame) missingFields.push('Start Frame');
+    if (!endFrame) missingFields.push('End Frame');
+
+    // Check for invalid frame range (end < start)
+    const startFrameNum = parseInt(startFrame, 10) || 0;
+    const endFrameNum = parseInt(endFrame, 10) || 0;
+    const hasFrameInput = startFrameNum > 0 || endFrameNum > 0;
+    const isInvalidFrameRange = hasFrameInput && (endFrameNum < startFrameNum);
+
+    if (isInvalidFrameRange) {
+      const proceed = confirm(`Warning: Invalid frame range detected!\nEnd Frame (${endFrameNum}) is less than Start Frame (${startFrameNum}).\n\nDo you still want to save?`);
+      if (!proceed) {
+        return;
+      }
+    } else if (missingFields.length > 0) {
+      const proceed = confirm(`Warning: The following fields are not filled:\n- ${missingFields.join('\n- ')}\n\nDo you still want to save?`);
+      if (!proceed) {
+        return;
+      }
     }
-  } else if (missingFields.length > 0) {
-    const proceed = confirm(`Warning: The following fields are not filled:\n- ${missingFields.join('\n- ')}\n\nDo you still want to save?`);
-    if (!proceed) {
-      return; // User cancelled
-    }
+
+    out = {
+      __retroMeta: {
+        uhid: uhid || null,
+        video: video || null,
+        startFrame: startFrame ? parseInt(startFrame, 10) : null,
+        endFrame: endFrame ? parseInt(endFrame, 10) : null,
+        segmentationFrame: segmentationFrame ? parseInt(segmentationFrame, 10) : null,
+        pii: piiEnabled,
+        csvFile: loadedCsvFilename || null,
+        savedAt: new Date().toISOString()
+      },
+      __meta: active ? { lastActive: active } : null,
+      report: JSON.parse(JSON.stringify(report || {})),
+      overallRemarks: document.getElementById('overallRemarks').value || ""
+    };
+
+    log('Saving report with retro metadata:', out.__retroMeta);
   }
-
-  // Build output object with retrospective metadata
-  const out = {
-    __retroMeta: {
-      uhid: uhid || null,
-      video: video || null,
-      startFrame: startFrame ? parseInt(startFrame, 10) : null,
-      endFrame: endFrame ? parseInt(endFrame, 10) : null,
-      segmentationFrame: segmentationFrame ? parseInt(segmentationFrame, 10) : null,
-      pii: piiEnabled,
-      csvFile: loadedCsvFilename || null,
-      savedAt: new Date().toISOString()
-    },
-    __meta: active ? { lastActive: active } : null,
-    report: JSON.parse(JSON.stringify(report || {})),
-    overallRemarks: document.getElementById('overallRemarks').value || ""
-  };
-
-  log('Saving report with retro metadata:', out.__retroMeta);
 
   // Update last saved state
   lastSavedReportState = JSON.stringify(report);
@@ -2478,6 +2816,7 @@ document.getElementById("csvFile").addEventListener("change", e => {
   r.onload = () => {
     try {
       log('CSV file read complete, parsing...');
+      loadedCsvText = r.result;
       const rows = parseCSV(r.result);
       if(rows.length === 0){
         logWarn('CSV parsing returned no valid rows');
@@ -2510,6 +2849,7 @@ Caustic Injury,Time_since_ingestion,,Upper,,single,,Time elapsed since ingestion
 Tumor Sample,Size,,Upper,,single,,Enter size.,,x,x,x,x,"float_box cm",,
 Simple Distance,Distance from incisors,,Upper,,single,,Distance only.,,x,,,,"int_box",,
 `;
+  loadedCsvText = sample;
   const rows = parseCSV(sample);
   buildFromCSV(rows);
   populateColumns();
@@ -2567,7 +2907,6 @@ let voiceWs = null;            // WebSocket instance
 let voiceAudioCtx = null;      // AudioContext (16kHz)
 let voiceMediaStream = null;   // getUserMedia stream
 let voiceActive = false;       // Dictation running
-let loadedCsvText = null;      // Raw CSV text (stored on CSV load)
 
 // ── applyVoiceUpdate ──
 
@@ -2621,6 +2960,26 @@ function applyVoiceUpdate(data) {
       } else {
         d.sublocations = d.sublocations || [];
       }
+      // Auto-add region names for matrix sublocations (e.g., "Antrum" for "Antrum - Posterior Wall")
+      const toAdd = [];
+      d.sublocations.forEach(s => {
+        const dash = s.indexOf(' - ');
+        if (dash > 0) {
+          const region = s.substring(0, dash);
+          if (!d.sublocations.includes(region) && !toAdd.includes(region)) {
+            toAdd.push(region);
+          }
+        }
+      });
+      if (toAdd.length) d.sublocations.push(...toAdd);
+    });
+  });
+
+  // Collect old disease set before replacing report
+  const oldDiseases = new Set();
+  Object.keys(report || {}).forEach(loc => {
+    Object.keys((report[loc] || {}).diseases || {}).forEach(dn => {
+      oldDiseases.add(loc + "::" + dn);
     });
   });
 
@@ -2632,8 +2991,20 @@ function applyVoiceUpdate(data) {
     document.getElementById("overallRemarks").value = newRemarks;
   }
 
-  // Preserve current active disease if it still exists
-  if (active && report[active.loc] &&
+  // Find newly added diseases
+  let newestDisease = null;
+  Object.keys(report).forEach(loc => {
+    Object.keys((report[loc] || {}).diseases || {}).forEach(dn => {
+      if (!oldDiseases.has(loc + "::" + dn)) {
+        newestDisease = { loc, disease: dn };
+      }
+    });
+  });
+
+  // Switch to newest disease if one was added, otherwise preserve active
+  if (newestDisease) {
+    active = newestDisease;
+  } else if (active && report[active.loc] &&
       report[active.loc].diseases &&
       report[active.loc].diseases[active.disease]) {
     // active is still valid — keep it
@@ -2952,18 +3323,7 @@ function _voiceCheckEnabled() {
 }
 
 // ── Manual Edit Sync ──
-// Wrap renderReport to notify backend of manual edits
-
-const _origRenderReport = typeof renderReport === "function" ? renderReport : null;
-
-if (_origRenderReport) {
-  // We don't overwrite renderReport directly since it would cause recursion
-  // in applyVoiceUpdate. Instead, we hook into user-driven edits via a
-  // MutationObserver-free approach: sync on a short debounce after renderReport.
-  // The backend already gets report_state messages.
-}
-
-// Debounced sync: called after manual edits to send state to backend
+// Debounced sync: called from renderReport() to send state to backend
 let _voiceSyncTimer = null;
 function voiceScheduleSync() {
   if (!voiceActive) return;
@@ -2990,30 +3350,619 @@ function voiceScheduleSync() {
   // Check enabled state initially and when CSV loads
   _voiceCheckEnabled();
 
-  // Hook into CSV load to store raw CSV text and re-check enabled state
+  // Re-check enabled state when CSV loads (loadedCsvText stored in 17-csv-upload.js)
   const csvInput = document.getElementById("csvFile");
   if (csvInput) {
-    csvInput.addEventListener("change", (e) => {
-      const f = e.target.files[0];
-      if (!f) return;
-      const reader = new FileReader();
-      reader.onload = () => {
-        loadedCsvText = reader.result;
-        // Re-check after a tick (CSV processing in 17-csv-upload.js runs first)
-        setTimeout(_voiceCheckEnabled, 100);
-      };
-      reader.readAsText(f);
+    csvInput.addEventListener("change", () => setTimeout(_voiceCheckEnabled, 100));
+  }
+  const sampleBtn = document.getElementById("loadSample");
+  if (sampleBtn) {
+    sampleBtn.addEventListener("click", () => setTimeout(_voiceCheckEnabled, 100));
+  }
+})();
+
+/* ---------- Sentences Report (LLM → Rich Text → PDF) ---------- */
+
+// ── Build report payload ──
+
+function _sentencesBuildPayload() {
+  if (studyType === 'prospective') {
+    return {
+      __prospMeta: {
+        uhid: prospectivePatient.uhid || null,
+        patientName: prospectivePatient.patientName || null,
+        gender: prospectivePatient.gender || null,
+        age: prospectivePatient.age || null,
+        indication: prospectivePatient.indication || null,
+        csvFile: loadedCsvFilename || null,
+      },
+      report: JSON.parse(JSON.stringify(report || {})),
+      overallRemarks: document.getElementById('overallRemarks').value || "",
+    };
+  }
+
+  const uhid = document.getElementById('uhidSelect').value;
+  const video = document.getElementById('videoSelect').value;
+  const startFrame = document.getElementById('startFrame').value;
+  const endFrame = document.getElementById('endFrame').value;
+  const segFrame = document.getElementById('segmentationFrame').value;
+
+  return {
+    __retroMeta: {
+      uhid: uhid || null,
+      video: video || null,
+      startFrame: startFrame ? parseInt(startFrame, 10) : null,
+      endFrame: endFrame ? parseInt(endFrame, 10) : null,
+      segmentationFrame: segFrame ? parseInt(segFrame, 10) : null,
+      pii: piiEnabled,
+      csvFile: loadedCsvFilename || null,
+    },
+    report: JSON.parse(JSON.stringify(report || {})),
+    overallRemarks: document.getElementById('overallRemarks').value || "",
+  };
+}
+
+// ── API call ──
+
+async function _sentencesCallApi(reportData) {
+  const resp = await fetch('/api/generate-report', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ report_data: reportData }),
+  });
+
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({ error: 'Unknown error' }));
+    throw new Error(err.error || 'HTTP ' + resp.status);
+  }
+
+  const data = await resp.json();
+  return data.html;
+}
+
+// ── Modal ──
+
+let _sentencesQuill = null;
+
+function _sentencesCreateModal() {
+  const existing = document.getElementById('sentencesModal');
+  if (existing) existing.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'sentencesModal';
+  overlay.className = 'fixed inset-0 z-50 flex items-center justify-center';
+  overlay.style.backgroundColor = 'rgba(0,0,0,0.5)';
+
+  const modal = document.createElement('div');
+  modal.className = 'bg-white rounded-lg shadow-2xl flex flex-col';
+  modal.style.cssText = 'width: 80vw; height: 85vh; max-width: 1200px;';
+
+  // Header
+  const header = document.createElement('div');
+  header.className = 'flex justify-between items-center px-6 py-4 border-b shrink-0';
+  header.innerHTML =
+    '<h2 class="text-xl font-bold text-gray-800">Endoscopy Sentences Report</h2>' +
+    '<button id="sentencesCloseBtn" class="text-gray-500 hover:text-gray-800 text-2xl leading-none">&times;</button>';
+  modal.appendChild(header);
+
+  // Loading state
+  const loadingDiv = document.createElement('div');
+  loadingDiv.id = 'sentencesLoading';
+  loadingDiv.className = 'flex-1 flex items-center justify-center';
+  loadingDiv.innerHTML =
+    '<div class="text-center">' +
+    '<div class="inline-block w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-4"></div>' +
+    '<p class="text-gray-600 text-lg">Generating report with AI...</p>' +
+    '<p class="text-gray-400 text-sm mt-2">This may take a few seconds</p>' +
+    '</div>';
+  modal.appendChild(loadingDiv);
+
+  // Editor wrapper (hidden initially)
+  const editorWrapper = document.createElement('div');
+  editorWrapper.id = 'sentencesEditorWrapper';
+  editorWrapper.className = 'flex-1 flex flex-col hidden overflow-hidden';
+
+  const editorContainer = document.createElement('div');
+  editorContainer.id = 'sentencesEditor';
+  editorContainer.className = 'flex-1 overflow-y-auto';
+  editorWrapper.appendChild(editorContainer);
+
+  modal.appendChild(editorWrapper);
+
+  // Footer
+  const footer = document.createElement('div');
+  footer.id = 'sentencesFooter';
+  footer.className = 'px-6 py-4 border-t flex justify-end gap-3 hidden shrink-0';
+  footer.innerHTML =
+    '<button id="sentencesPdfBtn" ' +
+    'class="bg-green-600 text-white px-6 py-2 rounded font-semibold hover:bg-green-700">' +
+    'Submit and Create PDF Report</button>';
+  modal.appendChild(footer);
+
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+
+  // Close handlers
+  document.getElementById('sentencesCloseBtn').onclick = _sentencesCloseModal;
+  overlay.addEventListener('click', function(e) {
+    if (e.target === overlay) _sentencesCloseModal();
+  });
+
+  overlay._escHandler = function(e) {
+    if (e.key === 'Escape') _sentencesCloseModal();
+  };
+  document.addEventListener('keydown', overlay._escHandler);
+
+  return overlay;
+}
+
+function _sentencesInitQuill(htmlContent) {
+  var loading = document.getElementById('sentencesLoading');
+  var editorWrapper = document.getElementById('sentencesEditorWrapper');
+  var footer = document.getElementById('sentencesFooter');
+
+  loading.classList.add('hidden');
+  editorWrapper.classList.remove('hidden');
+  footer.classList.remove('hidden');
+
+  _sentencesQuill = new Quill('#sentencesEditor', {
+    theme: 'snow',
+    modules: {
+      toolbar: [
+        [{ header: [1, 2, 3, false] }],
+        ['bold', 'italic', 'underline'],
+        [{ list: 'ordered' }, { list: 'bullet' }],
+        [{ align: [] }],
+        ['clean'],
+      ],
+    },
+  });
+
+  // Strip code fences if Gemini wraps output
+  var cleaned = htmlContent;
+  cleaned = cleaned.replace(/^```html?\s*/i, '');
+  cleaned = cleaned.replace(/\s*```\s*$/, '');
+
+  _sentencesQuill.root.innerHTML = cleaned;
+
+  document.getElementById('sentencesPdfBtn').onclick = _sentencesGeneratePdf;
+}
+
+function _sentencesCloseModal() {
+  var modal = document.getElementById('sentencesModal');
+  if (modal) {
+    document.removeEventListener('keydown', modal._escHandler);
+    modal.remove();
+  }
+  _sentencesQuill = null;
+}
+
+// ── PDF generation from rich text ──
+
+async function _sentencesGeneratePdf() {
+  if (!_sentencesQuill) return;
+
+  var btn = document.getElementById('sentencesPdfBtn');
+  btn.disabled = true;
+  btn.textContent = 'Generating PDF...';
+
+  try {
+    // Create a temporary container with print styling
+    var printDiv = document.createElement('div');
+    printDiv.style.cssText =
+      'padding: 20px; font-family: "Times New Roman", serif; font-size: 12pt; ' +
+      'line-height: 1.6; color: #000; max-width: 700px;';
+
+    // Title
+    var title = document.createElement('h1');
+    title.style.cssText = 'text-align: center; color: #1e40af; font-size: 18pt; margin-bottom: 16px;';
+    title.textContent = 'AIG Endoscopy Report';
+    printDiv.appendChild(title);
+
+    // Quill content
+    var content = document.createElement('div');
+    content.innerHTML = _sentencesQuill.root.innerHTML;
+
+    // Style headings and paragraphs for PDF
+    content.querySelectorAll('h1').forEach(function(el) { el.style.cssText = 'font-size: 18pt; font-weight: bold; margin-top: 12px;'; });
+    content.querySelectorAll('h2').forEach(function(el) { el.style.cssText = 'font-size: 15pt; font-weight: bold; margin-top: 10px; color: #1e40af;'; });
+    content.querySelectorAll('h3').forEach(function(el) { el.style.cssText = 'font-size: 13pt; font-weight: bold; margin-top: 8px;'; });
+    content.querySelectorAll('p').forEach(function(el) { el.style.cssText = 'margin-bottom: 6px;'; });
+
+    printDiv.appendChild(content);
+
+    // Append to body (modal overlay covers viewport so user won't see it)
+    // Must NOT use position:fixed or z-index:-1 — html2canvas can't render those
+    printDiv.style.width = '700px';
+    document.body.appendChild(printDiv);
+
+    var timestamp = generateTimestamp();
+    var uhid = (studyType === 'prospective') ? prospectivePatient.uhid : document.getElementById('uhidSelect').value;
+    var filenameBase = uhid ? uhid + '_sentences_' + timestamp : 'sentences_report_' + timestamp;
+
+    var opt = {
+      margin: [15, 15, 15, 15],
+      filename: filenameBase + '.pdf',
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+    };
+
+    await html2pdf().set(opt).from(printDiv).save();
+
+    document.body.removeChild(printDiv);
+
+    btn.textContent = 'PDF Downloaded!';
+    setTimeout(function() {
+      btn.disabled = false;
+      btn.textContent = 'Submit and Create PDF Report';
+    }, 2000);
+
+    log('Sentences report PDF generated:', filenameBase + '.pdf');
+  } catch (err) {
+    logError('Sentences PDF error:', err);
+    alert('Error generating PDF: ' + err.message);
+    btn.disabled = false;
+    btn.textContent = 'Submit and Create PDF Report';
+  }
+}
+
+// ── Main handler ──
+
+async function _sentencesGenerate() {
+  if (!report || Object.keys(report).length === 0) {
+    alert('No report data to generate from. Add findings first.');
+    return;
+  }
+
+  var isHttp = window.location.protocol === 'http:' || window.location.protocol === 'https:';
+  if (!isHttp) {
+    alert('Generate Sentences Report requires the server (python server.py). Not available in file:// mode.');
+    return;
+  }
+
+  var btn = document.getElementById('generateSentencesReport');
+  btn.disabled = true;
+
+  _sentencesCreateModal();
+
+  try {
+    var payload = _sentencesBuildPayload();
+    var html = await _sentencesCallApi(payload);
+    _sentencesInitQuill(html);
+  } catch (err) {
+    logError('Sentences report error:', err);
+    _sentencesCloseModal();
+    alert('Error generating sentences report: ' + err.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ── Init ──
+
+(function initSentencesReport() {
+  var btn = document.getElementById('generateSentencesReport');
+  if (btn) {
+    btn.addEventListener('click', _sentencesGenerate);
+  }
+})();
+
+/* ---------- Settings: dark mode, study type, display mode ---------- */
+
+/* ── Dark mode ── */
+
+function toggleDarkMode() {
+  darkMode = !darkMode;
+  document.body.classList.toggle('dark', darkMode);
+
+  const toggle = document.getElementById('darkModeToggle');
+  if (toggle) {
+    toggle.classList.toggle('active', darkMode);
+    toggle.classList.toggle('bg-blue-600', darkMode);
+    toggle.classList.toggle('bg-gray-300', !darkMode);
+  }
+
+  // Also style the settings panel itself
+  const panel = document.getElementById('settingsPanel');
+  if (panel) {
+    panel.classList.toggle('bg-gray-800', darkMode);
+    panel.classList.toggle('bg-white', !darkMode);
+    panel.classList.toggle('border-gray-600', darkMode);
+    panel.querySelectorAll('.text-gray-700').forEach(el => {
+      // handled by body.dark CSS overrides
     });
   }
 
-  // Re-check when DISEASES might be populated (after sample load)
-  const sampleBtn = document.getElementById("loadSample");
-  if (sampleBtn) {
-    sampleBtn.addEventListener("click", () => {
-      loadedCsvText = null; // Sample doesn't have raw CSV text for backend
-      setTimeout(_voiceCheckEnabled, 100);
+  localStorage.setItem('ehr_darkMode', darkMode ? '1' : '0');
+}
+
+/* ── Study type ── */
+
+function applyStudyType(type) {
+  studyType = type;
+
+  const retroEl = document.getElementById('retroControls');
+  const prospEl = document.getElementById('prospControls');
+  if (retroEl) retroEl.classList.toggle('hidden', type === 'prospective');
+  if (prospEl) prospEl.classList.toggle('hidden', type === 'retrospective');
+
+  // Hide/show disease-level frame controls in details pane
+  const diseaseFrameBar = document.getElementById('diseaseFrameBar');
+  if (diseaseFrameBar) diseaseFrameBar.classList.toggle('hidden', type === 'prospective');
+
+  // Update radio buttons to match
+  document.querySelectorAll('input[name="studyType"]').forEach(r => {
+    r.checked = (r.value === type);
+  });
+
+  localStorage.setItem('ehr_studyType', type);
+}
+
+/* ── Display mode ── */
+
+function applyDisplayMode(mode) {
+  const prev = displayMode;
+  displayMode = mode;
+
+  // Update radio buttons
+  document.querySelectorAll('input[name="displayMode"]').forEach(r => {
+    r.checked = (r.value === mode);
+  });
+
+  if (mode === 'portrait') {
+    _switchToPortrait();
+  } else if (prev === 'portrait') {
+    _switchToLandscape();
+  }
+}
+
+function _switchToPortrait() {
+  const mainLayout = document.getElementById('mainLayout');
+  const leftPane = document.getElementById('leftPane');
+  const rightPane = document.getElementById('rightPane');
+  const diseaseGridCard = document.getElementById('diseaseGridCard');
+  const diseaseColumnsGrid = document.getElementById('diseaseColumnsGrid');
+  const sublocSection = document.getElementById('sublocSection');
+  const detailsCard = document.getElementById('detailsCard');
+
+  // Hide the entire disease grid card (columns + sublocation are moved out)
+  if (diseaseGridCard) diseaseGridCard.classList.add('hidden');
+
+  // Create center pane
+  let centerPane = document.getElementById('centerPane');
+  if (!centerPane) {
+    centerPane = document.createElement('div');
+    centerPane.id = 'centerPane';
+    centerPane.className = 'space-y-4 min-w-0';
+    mainLayout.insertBefore(centerPane, rightPane);
+  }
+
+  // Create location pills
+  let locPills = document.getElementById('locationPills');
+  if (!locPills) {
+    locPills = document.createElement('div');
+    locPills.id = 'locationPills';
+    locPills.className = 'bg-white p-4 rounded shadow flex gap-3 flex-wrap';
+
+    ['Esophagus', 'GE Junction', 'Stomach', 'Duodenum'].forEach(loc => {
+      const pill = document.createElement('button');
+      pill.className = 'pill';
+      pill.textContent = loc;
+      pill.dataset.loc = loc;
+      pill.onclick = () => onPortraitLocationPillClick(loc);
+      locPills.appendChild(pill);
+    });
+
+    centerPane.appendChild(locPills);
+  }
+
+  // Move sublocation section to center pane
+  if (sublocSection) centerPane.appendChild(sublocSection);
+
+  // Move details card to center pane
+  if (detailsCard) centerPane.appendChild(detailsCard);
+
+  // Set grid layout on main
+  mainLayout.style.display = 'grid';
+  mainLayout.style.gridTemplateColumns = '20% 1fr 15%';
+  mainLayout.style.gap = '1rem';
+
+  // Left pane: narrow disease list
+  leftPane.style.width = '100%';
+  leftPane.classList.remove('w-3/4');
+
+  // Right pane: sticky report
+  rightPane.style.width = '100%';
+  rightPane.classList.remove('w-1/4');
+  rightPane.style.position = 'sticky';
+  rightPane.style.top = '1rem';
+  rightPane.style.maxHeight = 'calc(100vh - 2rem)';
+  rightPane.style.overflowY = 'auto';
+  rightPane.style.alignSelf = 'start';
+
+  // Render portrait disease list
+  populateColumns();
+}
+
+function _switchToLandscape() {
+  const mainLayout = document.getElementById('mainLayout');
+  const leftPane = document.getElementById('leftPane');
+  const rightPane = document.getElementById('rightPane');
+  const diseaseGridCard = document.getElementById('diseaseGridCard');
+  const diseaseColumnsGrid = document.getElementById('diseaseColumnsGrid');
+  const sublocSection = document.getElementById('sublocSection');
+  const detailsCard = document.getElementById('detailsCard');
+
+  // Show the disease grid card again
+  if (diseaseGridCard) diseaseGridCard.classList.remove('hidden');
+
+  // Move sublocation back into diseaseGridCard
+  if (sublocSection && diseaseGridCard) diseaseGridCard.appendChild(sublocSection);
+
+  // Move details card back to left pane
+  if (detailsCard && leftPane) leftPane.appendChild(detailsCard);
+
+  // Remove center pane and location pills
+  const centerPane = document.getElementById('centerPane');
+  if (centerPane) centerPane.remove();
+
+  // Remove portrait disease list
+  const portraitList = document.getElementById('portraitDiseaseList');
+  if (portraitList) portraitList.remove();
+
+  // Reset layout styles
+  mainLayout.style.display = '';
+  mainLayout.style.gridTemplateColumns = '';
+  mainLayout.style.gap = '';
+
+  leftPane.style.width = '';
+  leftPane.classList.add('w-3/4');
+
+  rightPane.style.width = '';
+  rightPane.classList.add('w-1/4');
+  rightPane.style.position = '';
+  rightPane.style.top = '';
+  rightPane.style.maxHeight = '';
+  rightPane.style.overflowY = '';
+  rightPane.style.alignSelf = '';
+
+  // Reset portrait state
+  portraitSelectedDisease = null;
+
+  // Re-render normal columns
+  populateColumns();
+  renderSubLocChips();
+}
+
+/* ── Portrait location pill click ── */
+
+function onPortraitLocationPillClick(loc) {
+  if (portraitSelectedDisease) {
+    const def = DISEASES[portraitSelectedDisease];
+    if (!def) return;
+    const locs = Object.keys(def.locations);
+
+    // Only act if disease applies to this location
+    if (!locs.includes(loc)) return;
+
+    // Add or open the disease at this location
+    selectedMainLoc = loc;
+    addOrOpenDisease(loc, portraitSelectedDisease);
+    renderSubLocChips();
+    refreshPortraitHighlights();
+    updatePortraitLocationPills();
+  } else {
+    // No disease focused — just switch sublocation view
+    selectedMainLoc = loc;
+    renderSubLocChips();
+    updatePortraitLocationPills();
+  }
+}
+
+/* ── Update portrait location pill states ── */
+
+function updatePortraitLocationPills() {
+  const pills = document.querySelectorAll('#locationPills .pill');
+  if (!pills.length) return;
+
+  // Get applicable locations for the focused or active disease
+  let applicableLocs = [];
+  const dn = portraitSelectedDisease || (active && active.disease);
+  if (dn && DISEASES[dn]) {
+    applicableLocs = Object.keys(DISEASES[dn].locations);
+  }
+
+  pills.forEach(btn => {
+    const loc = btn.dataset.loc;
+    const hasDisease = applicableLocs.length === 0 || applicableLocs.includes(loc);
+    const isCurrent = !!(active && active.loc === loc);
+
+    // Grey out inapplicable locations
+    btn.classList.toggle('portrait-greyed', !hasDisease);
+    btn.disabled = !hasDisease;
+
+    // Highlight the current active location
+    btn.classList.toggle('pill-selected', isCurrent && hasDisease);
+  });
+}
+
+/* ── Prospective patient input listeners ── */
+
+function _wireProspectiveInputs() {
+  const fields = {
+    'prospUhid': 'uhid',
+    'prospPatientName': 'patientName',
+    'prospGender': 'gender',
+    'prospAge': 'age',
+    'prospIndication': 'indication'
+  };
+
+  Object.entries(fields).forEach(([elId, key]) => {
+    const el = document.getElementById(elId);
+    if (el) {
+      el.addEventListener('input', () => {
+        prospectivePatient[key] = el.value;
+      });
+    }
+  });
+}
+
+/* ── Settings panel init ── */
+
+(function initSettings() {
+  const gearBtn = document.getElementById('settingsGearBtn');
+  const panel = document.getElementById('settingsPanel');
+
+  // Toggle settings panel
+  if (gearBtn && panel) {
+    gearBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      panel.classList.toggle('hidden');
+    });
+
+    // Close on click outside
+    document.addEventListener('click', (e) => {
+      if (!panel.contains(e.target) && e.target !== gearBtn) {
+        panel.classList.add('hidden');
+      }
     });
   }
+
+  // Dark mode toggle
+  const darkToggle = document.getElementById('darkModeToggle');
+  if (darkToggle) {
+    darkToggle.addEventListener('click', toggleDarkMode);
+  }
+
+  // Study type radios
+  document.querySelectorAll('input[name="studyType"]').forEach(radio => {
+    radio.addEventListener('change', () => {
+      if (radio.checked) applyStudyType(radio.value);
+    });
+  });
+
+  // Display mode radios
+  document.querySelectorAll('input[name="displayMode"]').forEach(radio => {
+    radio.addEventListener('change', () => {
+      if (radio.checked) applyDisplayMode(radio.value);
+    });
+  });
+
+  // Prospective input listeners
+  _wireProspectiveInputs();
+
+  // Restore saved settings from localStorage
+  if (localStorage.getItem('ehr_darkMode') === '1') {
+    toggleDarkMode();
+  }
+
+  const savedStudy = localStorage.getItem('ehr_studyType');
+  if (savedStudy && savedStudy !== 'retrospective') {
+    applyStudyType(savedStudy);
+  }
+
+  // Display mode is NOT persisted — always starts in landscape
 })();
 
 </script>

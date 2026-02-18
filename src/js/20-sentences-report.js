@@ -3,6 +3,21 @@
 // ── Build report payload ──
 
 function _sentencesBuildPayload() {
+  if (studyType === 'prospective') {
+    return {
+      __prospMeta: {
+        uhid: prospectivePatient.uhid || null,
+        patientName: prospectivePatient.patientName || null,
+        gender: prospectivePatient.gender || null,
+        age: prospectivePatient.age || null,
+        indication: prospectivePatient.indication || null,
+        csvFile: loadedCsvFilename || null,
+      },
+      report: JSON.parse(JSON.stringify(report || {})),
+      overallRemarks: document.getElementById('overallRemarks').value || "",
+    };
+  }
+
   const uhid = document.getElementById('uhidSelect').value;
   const video = document.getElementById('videoSelect').value;
   const startFrame = document.getElementById('startFrame').value;
@@ -199,7 +214,7 @@ async function _sentencesGeneratePdf() {
     document.body.appendChild(printDiv);
 
     var timestamp = generateTimestamp();
-    var uhid = document.getElementById('uhidSelect').value;
+    var uhid = (studyType === 'prospective') ? prospectivePatient.uhid : document.getElementById('uhidSelect').value;
     var filenameBase = uhid ? uhid + '_sentences_' + timestamp : 'sentences_report_' + timestamp;
 
     var opt = {

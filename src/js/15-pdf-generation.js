@@ -88,6 +88,25 @@ function generatePDF(data, filename) {
     yPos += 4;
   }
 
+  // Prospective metadata
+  if (data.__prospMeta) {
+    const meta = data.__prospMeta;
+    addLine();
+    addText('Patient Information', 12, true);
+    yPos += 2;
+    if (meta.uhid) addText(`UHID: ${meta.uhid}`, 10, false, 5);
+    if (meta.patientName) addText(`Patient Name: ${meta.patientName}`, 10, false, 5);
+    if (meta.gender) addText(`Gender: ${meta.gender}`, 10, false, 5);
+    if (meta.age) addText(`Age: ${meta.age}`, 10, false, 5);
+    if (meta.indication) addText(`Indication: ${meta.indication}`, 10, false, 5);
+    if (meta.csvFile) addText(`CSV File: ${meta.csvFile}`, 10, false, 5);
+    if (meta.savedAt) {
+      const savedDate = new Date(meta.savedAt).toLocaleString();
+      addText(`Saved: ${savedDate}`, 10, false, 5);
+    }
+    yPos += 4;
+  }
+
   // Report content
   const reportData = data.report || {};
 

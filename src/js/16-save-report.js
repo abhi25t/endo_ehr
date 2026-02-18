@@ -5,81 +5,114 @@ document.getElementById("clearReport").onclick = () => {
   report = {};
   active = null;
   document.getElementById("detailsCard").classList.add("hidden");
-  document.getElementById("startFrame").value = "";
-  document.getElementById("endFrame").value = "";
-  document.getElementById("segmentationFrame").value = "";
   document.getElementById("overallRemarks").value = "";
 
-  // Also clear UHID and Video selections
-  document.getElementById("uhidSelect").value = "";
-  document.getElementById("videoSelect").innerHTML = '<option value="">-- Select Video --</option>';
-  document.getElementById("videoSelect").disabled = true;
-  previousUhidSelection = ""; // Reset the previous selection tracker
+  if (studyType === 'prospective') {
+    // Clear prospective fields
+    ['prospUhid', 'prospPatientName', 'prospGender', 'prospAge', 'prospIndication'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = '';
+    });
+    prospectivePatient = { uhid: '', patientName: '', gender: '', age: '', indication: '' };
+  } else {
+    // Clear retrospective fields
+    document.getElementById("startFrame").value = "";
+    document.getElementById("endFrame").value = "";
+    document.getElementById("segmentationFrame").value = "";
+    document.getElementById("uhidSelect").value = "";
+    document.getElementById("videoSelect").innerHTML = '<option value="">-- Select Video --</option>';
+    document.getElementById("videoSelect").disabled = true;
+    previousUhidSelection = "";
+    piiEnabled = false;
+    updatePiiButtonState();
+    updateFrameCalculations();
+  }
 
   // Reset saved state since report is now empty
   lastSavedReportState = JSON.stringify(report);
 
-  // Reset PII state
-  piiEnabled = false;
-  updatePiiButtonState();
-
-  updateFrameCalculations();
   renderReport();
   populateColumns();
   renderSubLocChips();
   document.getElementById("csvNote").textContent = "Report cleared.";
 };
 
-// Save JSON and PDF with retrospective data
+// Save JSON and PDF with retrospective or prospective data
 document.getElementById("saveJSON").onclick = async () => {
-  const uhid = document.getElementById('uhidSelect').value;
-  const video = document.getElementById('videoSelect').value;
-  const startFrame = document.getElementById('startFrame').value;
-  const endFrame = document.getElementById('endFrame').value;
-  const segmentationFrame = document.getElementById('segmentationFrame').value;
+  let out;
+  let uhid;
 
-  // Check for missing required fields and warn user
-  const missingFields = [];
-  if (!video) missingFields.push('Video');
-  if (!startFrame) missingFields.push('Start Frame');
-  if (!endFrame) missingFields.push('End Frame');
+  if (studyType === 'prospective') {
+    // Prospective: use text field inputs
+    uhid = prospectivePatient.uhid || '';
 
-  // Check for invalid frame range (end < start)
-  const startFrameNum = parseInt(startFrame, 10) || 0;
-  const endFrameNum = parseInt(endFrame, 10) || 0;
-  const hasFrameInput = startFrameNum > 0 || endFrameNum > 0;
-  const isInvalidFrameRange = hasFrameInput && (endFrameNum < startFrameNum);
+    out = {
+      __prospMeta: {
+        uhid: uhid || null,
+        patientName: prospectivePatient.patientName || null,
+        gender: prospectivePatient.gender || null,
+        age: prospectivePatient.age || null,
+        indication: prospectivePatient.indication || null,
+        csvFile: loadedCsvFilename || null,
+        savedAt: new Date().toISOString()
+      },
+      __meta: active ? { lastActive: active } : null,
+      report: JSON.parse(JSON.stringify(report || {})),
+      overallRemarks: document.getElementById('overallRemarks').value || ""
+    };
 
-  if (isInvalidFrameRange) {
-    const proceed = confirm(`Warning: Invalid frame range detected!\nEnd Frame (${endFrameNum}) is less than Start Frame (${startFrameNum}).\n\nDo you still want to save?`);
-    if (!proceed) {
-      return; // User cancelled
+    log('Saving report with prospective metadata:', out.__prospMeta);
+
+  } else {
+    // Retrospective: existing logic
+    uhid = document.getElementById('uhidSelect').value;
+    const video = document.getElementById('videoSelect').value;
+    const startFrame = document.getElementById('startFrame').value;
+    const endFrame = document.getElementById('endFrame').value;
+    const segmentationFrame = document.getElementById('segmentationFrame').value;
+
+    // Check for missing required fields and warn user
+    const missingFields = [];
+    if (!video) missingFields.push('Video');
+    if (!startFrame) missingFields.push('Start Frame');
+    if (!endFrame) missingFields.push('End Frame');
+
+    // Check for invalid frame range (end < start)
+    const startFrameNum = parseInt(startFrame, 10) || 0;
+    const endFrameNum = parseInt(endFrame, 10) || 0;
+    const hasFrameInput = startFrameNum > 0 || endFrameNum > 0;
+    const isInvalidFrameRange = hasFrameInput && (endFrameNum < startFrameNum);
+
+    if (isInvalidFrameRange) {
+      const proceed = confirm(`Warning: Invalid frame range detected!\nEnd Frame (${endFrameNum}) is less than Start Frame (${startFrameNum}).\n\nDo you still want to save?`);
+      if (!proceed) {
+        return;
+      }
+    } else if (missingFields.length > 0) {
+      const proceed = confirm(`Warning: The following fields are not filled:\n- ${missingFields.join('\n- ')}\n\nDo you still want to save?`);
+      if (!proceed) {
+        return;
+      }
     }
-  } else if (missingFields.length > 0) {
-    const proceed = confirm(`Warning: The following fields are not filled:\n- ${missingFields.join('\n- ')}\n\nDo you still want to save?`);
-    if (!proceed) {
-      return; // User cancelled
-    }
+
+    out = {
+      __retroMeta: {
+        uhid: uhid || null,
+        video: video || null,
+        startFrame: startFrame ? parseInt(startFrame, 10) : null,
+        endFrame: endFrame ? parseInt(endFrame, 10) : null,
+        segmentationFrame: segmentationFrame ? parseInt(segmentationFrame, 10) : null,
+        pii: piiEnabled,
+        csvFile: loadedCsvFilename || null,
+        savedAt: new Date().toISOString()
+      },
+      __meta: active ? { lastActive: active } : null,
+      report: JSON.parse(JSON.stringify(report || {})),
+      overallRemarks: document.getElementById('overallRemarks').value || ""
+    };
+
+    log('Saving report with retro metadata:', out.__retroMeta);
   }
-
-  // Build output object with retrospective metadata
-  const out = {
-    __retroMeta: {
-      uhid: uhid || null,
-      video: video || null,
-      startFrame: startFrame ? parseInt(startFrame, 10) : null,
-      endFrame: endFrame ? parseInt(endFrame, 10) : null,
-      segmentationFrame: segmentationFrame ? parseInt(segmentationFrame, 10) : null,
-      pii: piiEnabled,
-      csvFile: loadedCsvFilename || null,
-      savedAt: new Date().toISOString()
-    },
-    __meta: active ? { lastActive: active } : null,
-    report: JSON.parse(JSON.stringify(report || {})),
-    overallRemarks: document.getElementById('overallRemarks').value || ""
-  };
-
-  log('Saving report with retro metadata:', out.__retroMeta);
 
   // Update last saved state
   lastSavedReportState = JSON.stringify(report);

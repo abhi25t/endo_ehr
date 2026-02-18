@@ -11,7 +11,7 @@ The app has two modes:
 ## Tech Stack
 
 ### Frontend
-- **Modular JavaScript** — 19 source files in `src/js/`, built into a single distributable HTML
+- **Modular JavaScript** — 21 source files in `src/js/`, built into a single distributable HTML
 - **Tailwind CSS** via CDN (`https://cdn.tailwindcss.com`)
 - **jsPDF** for structured PDF generation (`https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js`)
 - **Quill.js** rich text editor for sentences report (`https://cdn.quilljs.com/1.3.7/quill.min.js`)
@@ -61,9 +61,9 @@ project/
         ├── 03-hint-helpers.js  # createHintElement()
         ├── 04-input-helpers.js # parseAttributePattern(), groupHasAnyValue(), renderGroupLabel()
         ├── 05-constants.js     # SUBLOCATIONS, STOMACH/DUODENUM matrices, VIDEO_EXTENSIONS, FPS
-        ├── 06-state.js         # All mutable globals (DISEASES, report, active, retroData, loadedCsvText, etc.)
+        ├── 06-state.js         # All mutable globals (DISEASES, report, active, retroData, loadedCsvText, settings state, etc.)
         ├── 07-conditional-logic.js  # evaluateSingleCondition(), evaluateConditional()
-        ├── 08-disease-columns.js    # populateColumns(), refreshLeftHighlights()
+        ├── 08-disease-columns.js    # populateColumns(), refreshLeftHighlights(), portrait variants
         ├── 09-sublocation-ui.js     # renderSubLocChips(), renderSublocMatrix(), toggle functions
         ├── 10-disease-management.js # addOrOpenDisease(), openDetails(), frame data handlers
         ├── 11-details-pane.js       # renderDetailsSections(), renderRow(), renderInputAttribute(), makePill()
@@ -75,7 +75,8 @@ project/
         ├── 17-csv-upload.js         # CSV file handler (stores loadedCsvText), sample loader, JSON file load
         ├── 18-init.js               # Init IIFE
         ├── 19-voice.js             # Voice dictation: audio capture, WebSocket, applyVoiceUpdate(), UI
-        └── 20-sentences-report.js  # Sentences report: Gemini → Quill rich text editor → PDF via html2pdf.js
+        ├── 20-sentences-report.js  # Sentences report: Gemini → Quill rich text editor → PDF via html2pdf.js
+        └── 21-settings.js         # Settings panel: dark mode, study type (retro/prosp), display mode (landscape/portrait)
 ```
 
 ## Development Workflow
@@ -146,6 +147,7 @@ applyVoiceUpdate(report)
 | Schema Builder | `schema_builder.py` | CSV → canonical schema JSON for LLM context |
 | Pydantic Models | `models.py` | EHRReport, DiseaseEntry, SectionEntry validation |
 | Frontend Voice | `src/js/19-voice.js` | Audio capture, WebSocket client, applyVoiceUpdate(), UI |
+| Frontend Settings | `src/js/21-settings.js` | Dark mode, study type, display mode, portrait layout, localStorage |
 
 ### Voice Command Keywords (Pre-LLM Detection)
 
@@ -217,9 +219,10 @@ When the user makes manual edits while voice is active:
 
 ## Layout Structure
 
-### Main Layout (70/30 Split)
-- **Left Pane (70%)**: Diagnosis section
-- **Right Pane (30%)**: Report section
+### Main Layout — Landscape Mode (75/25 Split)
+- **Left Pane (75%)** `#leftPane`: Diagnosis section
+- **Right Pane (25%)** `#rightPane`: Report section
+- Portrait mode uses a different 20/65/15 three-column layout (see Settings Panel → Portrait Layout)
 
 ### Left Pane Components
 
@@ -281,31 +284,95 @@ When the user makes manual edits while voice is active:
 3. **Overall Remarks**
    - Text area at bottom (not included in disease reports)
 
-## Retrospective Analysis & Voice Controls
+## Settings Panel
 
-Located below the main heading in a single control bar:
+A gear button (&#9881;) at the top-right corner opens a settings dropdown with three options:
 
+### Dark Mode
+- Toggle with crescent moon icon (&#9790;)
+- Implemented via CSS overrides on `body.dark` class (not Tailwind `dark:` prefix)
+- Overrides `.bg-white`, `.bg-gray-100`, `.text-gray-*`, `.border-*`, `.pill`, `.left-disease`, inputs, textareas, selects
+- Also styles Quill editor toolbar/container for sentences report modal
+- Persisted in `localStorage` key `ehr_darkMode`
+
+### Study Type: Retrospective vs Prospective
+- **Retrospective** (default): Shows `#retroControls` — Load Videos Folder, UHID dropdown, Video dropdown, Frame inputs, PII toggle
+- **Prospective**: Shows `#prospControls` — 5 text fields: UHID (`#prospUhid`), Patient Name (`#prospPatientName`), Gender (`#prospGender`), Age (`#prospAge`), Indication (`#prospIndication`)
+- Shared controls (Voice + CSV) in `#sharedControls` are always visible in both modes
+- Disease-specific frame controls (`#diseaseFrameBar`) hidden in prospective mode
+- Prospective data saved as `__prospMeta` in JSON (vs `__retroMeta` for retrospective)
+- `__prospMeta` includes: uhid, patientName, gender, age, indication, csvFile, savedAt
+- PDF generation renders "Patient Information" section for prospective data
+- Sentences report payload includes `__prospMeta` when in prospective mode
+- `loadJsonFromText()` auto-switches to prospective mode when loading JSON with `__prospMeta`
+- Persisted in `localStorage` key `ehr_studyType`
+
+### Display Mode: Landscape vs Portrait
+- **Landscape** (default): Original 75/25 two-pane layout with 4-column disease grid
+- **Portrait**: Three-column layout (20% / 65% / 15%) for 1080x1920 portrait TV
+- Display mode is NOT persisted — always starts in landscape
+
+#### Portrait Layout Structure
+
+| Column | Width | Content |
+|--------|-------|---------|
+| Left (20%) | `#leftPane` → `#portraitDiseaseList` | Single-column deduplicated disease list |
+| Center (65%) | `#centerPane` (dynamically created) | Location pills + Sub-location + Details |
+| Right (15%) | `#rightPane` (sticky) | Report pane (always visible during scroll) |
+
+#### Portrait Interaction Model (Disease-First)
+
+The portrait mode uses a **disease-first** interaction model (opposite of landscape):
+
+1. **Click disease in left panel** → location pills update:
+   - Inapplicable locations are greyed out (`.portrait-greyed`)
+   - If disease has only 1 applicable location → auto-adds to report immediately
+   - If disease has multiple applicable locations → shows focus ring (`.portrait-focused`), waits for location pill click
+   - If disease is already in report → opens existing instance
+2. **Click location pill** → if a disease is focused:
+   - Adds the disease under that location via `addOrOpenDisease()`
+   - Sets `selectedMainLoc`, renders sublocation chips, opens details
+   - Clicking another applicable location pill adds a NEW instance of the same disease under that location
+3. **State variable**: `portraitSelectedDisease` (string|null) — the disease currently focused before location is chosen
+
+#### Portrait DOM Manipulation (in `21-settings.js`)
+
+When switching to portrait:
+1. `#diseaseGridCard` is hidden (4-column grid)
+2. `#centerPane` is created between leftPane and rightPane
+3. `#locationPills` (4 organ location buttons) created inside centerPane
+4. `#sublocSection` moved from diseaseGridCard → centerPane
+5. `#detailsCard` moved from leftPane → centerPane
+6. `#mainLayout` switches from `display: flex` to `display: grid; grid-template-columns: 20% 1fr 15%`
+7. `#rightPane` made sticky (`position: sticky; top: 1rem; max-height: calc(100vh - 2rem)`)
+8. `populateColumnsPortrait()` renders the single-column disease list
+
+When switching back to landscape: all DOM moves are reversed, centerPane is removed.
+
+## Control Bars
+
+The control area below the heading is split into three sections:
+
+### `#retroControls` (Retrospective only)
 1. **Load Videos Folder** button - Opens folder picker
 2. **UHID Dropdown** - Shows patient folders with JSON count
    - Color coding: Black (0 JSONs), Blue (1 JSON), Red (>1 JSONs)
    - Re-loads folder on click to refresh counts
 3. **Video Dropdown** - Shows videos in selected UHID folder
    - Auto-selects if only one video exists
-4. **Frame Inputs**:
-   - Start Frame (integer)
-   - End Frame (integer)
-   - \# Frames (calculated: end - start + 1)
-   - Duration (calculated: frames / 25 fps)
-   - Segmentation Frame (integer)
+4. **Frame Inputs**: Start Frame, End Frame, # Frames, Duration, Segmentation Frame
 5. **PII Toggle** - Orange pill for marking PII content
-6. **Voice Dictation Toggle** - Green "Start Dictation" / Red "Stop Dictation" button
+
+### `#prospControls` (Prospective only, hidden by default)
+5 text inputs: UHID, Patient Name, Gender, Age, Indication
+
+### `#sharedControls` (Always visible)
+1. **Voice Dictation Toggle** - Green "Start Dictation" / Red "Stop Dictation" button
    - Disabled when: no CSV loaded, file:// protocol, no getUserMedia
    - Status indicator next to button: "Listening...", "AI Processing...", "Paused", "Disconnected"
-7. **Transcript Bar** - Below controls, hidden until dictation starts
-   - Partial transcripts in gray italic
-   - Final transcripts in black
-   - "PAUSED" in orange when voice paused
-8. **CSV File Input** - Load disease definitions (right-aligned)
+2. **Transcript Bar** - Below controls, hidden until dictation starts
+   - Partial transcripts in gray italic, final transcripts in black
+3. **CSV File Input** - Load disease definitions (right-aligned)
 
 ## CSV Format
 
@@ -401,6 +468,7 @@ Format: `Subsection(Name=Value)` or `Section(Name=Value)`
 ### Report Structure
 ```javascript
 {
+  // Retrospective mode:
   __retroMeta: {
     uhid: string,
     video: string,
@@ -408,6 +476,16 @@ Format: `Subsection(Name=Value)` or `Section(Name=Value)`
     endFrame: number,
     segmentationFrame: number,
     pii: boolean,
+    csvFile: string,
+    savedAt: ISO timestamp
+  },
+  // OR Prospective mode:
+  __prospMeta: {
+    uhid: string,
+    patientName: string,
+    gender: string,
+    age: string,
+    indication: string,
     csvFile: string,
     savedAt: ISO timestamp
   },
@@ -494,13 +572,21 @@ Validation pipeline: Parse JSON → Pydantic model_validate → strip invalid lo
 - `.pill` - Base pill style
 - `.pill-selected` - Selected state (blue background)
 - `.attr-pill` - Attribute pill variant
+- `.pill.portrait-greyed` - Greyed out location pill (inapplicable for selected disease)
 
 ### Disease Items
 - `.left-disease` - Disease button in location columns
 - `.left-disease.selected` - Selected/in-report state
+- `.left-disease.portrait-greyed` - Greyed out disease (portrait mode, inapplicable location)
+- `.left-disease.portrait-focused` - Focused disease awaiting location selection (blue ring)
 
 ### Layout
 - `.loc-column` - Location column container (min-height: 320px, max-height: 420px, overflow: auto)
+
+### Dark Mode
+- `body.dark` - Dark mode active (applied to `<body>`)
+- All Tailwind utility overrides under `body.dark` selector (e.g., `body.dark .bg-white`)
+- `.toggle-switch` / `.toggle-knob` - Custom toggle switch for dark mode
 
 ## Known Issues & Fixes Applied
 
@@ -518,6 +604,11 @@ Validation pipeline: Parse JSON → Pydantic model_validate → strip invalid lo
 12. ✅ New disease auto-opens in details pane (voice update now detects newly added diseases)
 13. ✅ Batcher flush on stop (last sentence no longer lost when stopping dictation)
 14. ✅ Sentences report PDF rendering (html2canvas requires element in normal document flow, not positioned off-viewport)
+15. ✅ Settings panel with dark mode, study type, and display mode
+16. ✅ Prospective mode with patient demographics (UHID, Name, Gender, Age, Indication)
+17. ✅ Portrait display mode with disease-first interaction model
+18. ✅ Dark mode via CSS overrides (avoids touching JS rendering functions)
+19. ✅ Multi-location disease support in portrait mode (e.g., Ulcer added separately to Stomach and Duodenum)
 
 ## Development Notes
 
@@ -560,6 +651,13 @@ Backend logging: Python `logging` module, logger name `"ehr-voice"`, level INFO.
 | `generate_sentences_report(json)` | `llm_caller` | Gemini call to convert EHR JSON → prose HTML |
 | `_sentencesGenerate()` | `20-sentences-report` | Main handler: modal + API call + Quill init |
 | `_sentencesGeneratePdf()` | `20-sentences-report` | html2pdf.js PDF generation from Quill content |
+| `toggleDarkMode()` | `21-settings` | Toggle dark mode on/off, update CSS class + localStorage |
+| `applyStudyType(type)` | `21-settings` | Switch between retrospective/prospective, show/hide control bars |
+| `applyDisplayMode(mode)` | `21-settings` | Switch between landscape/portrait, DOM rearrangement |
+| `populateColumnsPortrait()` | `08-disease-columns` | Render single-column deduplicated disease list for portrait |
+| `refreshPortraitHighlights()` | `08-disease-columns` | Update disease button states in portrait mode |
+| `onPortraitLocationPillClick(loc)` | `21-settings` | Handle location pill click in portrait mode |
+| `updatePortraitLocationPills()` | `21-settings` | Update location pill greying/highlighting based on active disease |
 
 ### Adding New Matrix Locations
 
@@ -641,6 +739,37 @@ python schema_builder.py EGD_Heirarchial_Menu-20260214.csv
 - [ ] Click "Stop Dictation" → mic releases, button returns to green
 - [ ] Manual pill clicks during voice session sync to backend
 - [ ] Save button works normally with voice-entered data
+
+### Settings Panel
+- [ ] Gear icon visible top-right corner
+- [ ] Click opens dropdown, click outside closes it
+- [ ] Dark mode toggle → all backgrounds/text/pills invert correctly
+- [ ] Dark mode persists across page reload (localStorage)
+- [ ] Study type: Retrospective → retro controls visible, prospective hidden
+- [ ] Study type: Prospective → 5 patient text fields visible, retro controls hidden
+- [ ] Disease frame bar in details pane hidden in prospective mode
+- [ ] Study type persists across page reload (localStorage)
+- [ ] Display mode: Portrait → 3-column layout with disease list, center area, sticky report
+- [ ] Display mode: Landscape → restores original 75/25 layout
+
+### Portrait Mode
+- [ ] Disease list shows each disease once (deduplicated)
+- [ ] Click single-location disease → auto-adds to report, location pill highlighted
+- [ ] Click multi-location disease → focus ring shown, location pills update (inapplicable greyed)
+- [ ] Click applicable location pill → disease added under that location
+- [ ] Click another applicable location pill → NEW instance added under that location
+- [ ] Both instances visible in report pane
+- [ ] Click disease already in report → opens existing instance
+- [ ] Report pane stays visible while scrolling (sticky)
+
+### Prospective Mode
+- [ ] Fill in UHID, Patient Name, Gender, Age, Indication
+- [ ] Save → JSON has `__prospMeta` with patient info
+- [ ] PDF shows "Patient Information" section
+- [ ] Load saved prospective JSON → auto-switches to prospective mode, fields restore
+- [ ] Clear → prospective fields cleared
+- [ ] Sentences report includes prospective patient data in payload
+- [ ] Sentences PDF uses prospective UHID in filename
 
 ### Sentences Report
 - [ ] Button visible below Overall Remarks
