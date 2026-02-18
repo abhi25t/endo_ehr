@@ -1,17 +1,15 @@
 """
-EHR Schema Builder — Generates canonical EHR schema JSON + ASR phrase set from CSV.
+EHR Schema Builder — Generates canonical EHR schema JSON from CSV.
 
 Usage:
     python schema_builder.py EGD_Heirarchial_Menu-20260214.csv
 
 Outputs:
     - EHR schema JSON (for LLM context)
-    - Phrase hints list (for Google Cloud Speech-to-Text adaptation)
 """
 
 import csv
 import json
-import re
 import sys
 import io
 from collections import OrderedDict
@@ -38,69 +36,6 @@ SUBLOCATIONS = {
 }
 
 LOCATION_COLS = ["Esophagus", "GE Junction", "Stomach", "Duodenum"]
-
-
-# ── Common English words to EXCLUDE from phrase hints ──
-# These are words that ASR already handles well. We only want medical jargon
-# that ASR might misrecognize without hints.
-
-COMMON_WORDS = {
-    # Articles, conjunctions, prepositions
-    "a", "an", "the", "and", "or", "but", "not", "if", "as", "so",
-    "of", "in", "on", "at", "to", "for", "from", "with", "by", "per",
-    "after", "before", "during", "within", "between", "into", "over",
-    "less", "than", "more", "greater", "about", "up", "down", "out",
-    # Common verbs
-    "is", "are", "was", "were", "has", "have", "had", "been", "be",
-    "taken", "done", "seen", "performed", "achieved", "required", "needed",
-    "attempted", "planned", "recommended", "suspected", "confirmed", "known",
-    "measured", "specify", "describe", "select", "assess", "assessed",
-    "indicated", "removed", "placed", "used", "noted", "observed",
-    "obtained", "sent", "taken", "given", "applied", "deferred",
-    "avoided", "considered", "feasible", "applicable", "visualized",
-    # Basic yes/no/presence
-    "yes", "no", "none", "other", "present", "absent", "unknown",
-    "normal", "positive", "negative", "true", "false",
-    # Quantity/size descriptors
-    "single", "multiple", "few", "numerous", "many", "several",
-    "small", "medium", "large", "giant", "tiny", "massive",
-    "entire", "whole", "total", "only", "all", "both", "each",
-    # Severity/quality
-    "mild", "moderate", "severe", "minimal", "significant", "marked",
-    "good", "poor", "fair", "adequate", "inadequate",
-    "partial", "complete", "incomplete", "failed", "success", "successful",
-    "active", "inactive", "acute", "chronic",
-    # Distribution
-    "localised", "localized", "focal", "patchy", "diffuse",
-    "generalized", "generalised", "scattered", "widespread",
-    "flat", "raised", "slightly", "deeply", "elevated", "depressed",
-    # Shape/quality (common English)
-    "clean", "smooth", "round", "irregular", "rough", "clear",
-    "soft", "hard", "firm", "thin", "thick", "narrow", "wide",
-    "long", "short", "deep", "shallow",
-    "well", "defined", "ill", "new", "old", "fresh",
-    "dark", "light", "white", "black", "red", "blue", "brown", "yellow",
-    "pale", "bright", "dull",
-    # Directional
-    "left", "right", "upper", "lower", "anterior", "posterior",
-    "lateral", "medial", "superior", "inferior",
-    "proximal", "distal", "central", "peripheral",
-    # General categories (common English)
-    "type", "grade", "stage", "size", "number", "count", "total",
-    "appearance", "morphology", "pattern", "features", "status",
-    "location", "surface", "color", "view", "site", "area", "region",
-    "body", "wall", "border", "edge", "base", "margin", "tip",
-    # Clinical process terms (common English)
-    "biopsy", "therapy", "treatment", "intervention", "procedure",
-    "diagnosis", "impression", "plan", "follow", "referral",
-    "result", "outcome", "response", "effect", "cause",
-    "risk", "complication", "complications", "bleeding", "blood",
-    "lesion", "mass", "tissue", "fluid", "debris",
-    # Units
-    "mm", "cm", "ml", "sec", "min", "bits",
-    # Negation phrases
-    "not", "non", "no",
-}
 
 
 def _is_x(val: str) -> bool:
@@ -238,142 +173,6 @@ def build_schema(csv_text: str) -> dict:
     }
 
 
-def extract_phrase_hints(schema: dict) -> list[str]:
-    """
-    Extract medical jargon phrases from the schema for Google ASR adaptation.
-
-    Google ASR PhraseSet limit: 500 phrases. We prioritize:
-    1. Disease names (most important — unique medical terms)
-    2. Short medical terms from attributes (1-4 words)
-    3. Sublocation anatomical terms
-    4. Section/subsection names that are medical terms
-
-    Filters out: common English, long descriptive sentences, input patterns,
-    numbers, ranges, and near-duplicates.
-    """
-    # Separate by priority tier
-    tier1_diseases = set()  # Disease names — always include
-    tier2_terms = set()     # Short medical attribute values
-    tier3_anatomy = set()   # Sublocation anatomical terms
-    tier4_sections = set()  # Section/subsection names
-
-    # Disease names
-    for dname in schema["diseases"]:
-        tier1_diseases.add(dname)
-
-    # Section names, subsection names, attribute values
-    for dname, ddef in schema["diseases"].items():
-        for sname, sdef in ddef.get("sections", {}).items():
-            tier4_sections.add(sname)
-            for attr in sdef.get("attributes", []):
-                _collect_medical_terms(tier2_terms, attr)
-            for subname, subdef in sdef.get("subsections", {}).items():
-                tier4_sections.add(subname)
-                for attr in subdef.get("attributes", []):
-                    _collect_medical_terms(tier2_terms, attr)
-
-    # Sublocation terms
-    for loc, sublocs in schema["sublocations"].items():
-        if isinstance(sublocs, list):
-            for s in sublocs:
-                tier3_anatomy.add(s)
-        elif isinstance(sublocs, dict):
-            for region, options in sublocs.items():
-                if region != "_standalone":
-                    tier3_anatomy.add(region)
-                if isinstance(options, list):
-                    for opt in options:
-                        tier3_anatomy.add(opt)
-
-    # Apply filters to each tier
-    result = set()
-    for phrase in tier1_diseases:
-        if _is_useful_hint(phrase):
-            result.add(phrase)
-    for phrase in tier3_anatomy:
-        if _is_useful_hint(phrase):
-            result.add(phrase)
-    for phrase in tier2_terms:
-        if _is_useful_hint(phrase):
-            result.add(phrase)
-    for phrase in tier4_sections:
-        if _is_useful_hint(phrase):
-            result.add(phrase)
-
-    # Case-insensitive dedup (keep first encountered version)
-    seen_lower = {}
-    for h in sorted(result):
-        low = h.lower()
-        if low not in seen_lower:
-            seen_lower[low] = h
-
-    # Return all valid hints sorted. The ASR bridge splits into
-    # multiple PhraseSets of 500 each (Google API limit per set).
-    return sorted(seen_lower.values())
-
-
-def _collect_medical_terms(terms: set, attr: str):
-    """Extract useful phrase hints from an attribute value."""
-    attr = attr.strip()
-    if not attr:
-        return
-    # Skip pure input box patterns
-    if re.match(r"^(int_box|float_box|alphanum_box)(\s|$)", attr, re.I):
-        return
-    if re.search(r"\b(int_box|float_box|alphanum_box)\b", attr, re.I):
-        # Has input box mixed with text — extract the text part only
-        text_part = re.sub(r"\b(int_box|float_box|alphanum_box)\b", "", attr).strip()
-        text_part = re.sub(r"\s+", " ", text_part).strip(" :,")
-        if text_part and len(text_part) > 2:
-            terms.add(text_part)
-        return
-    # Skip Range(...)
-    if re.match(r"^Range\(", attr, re.I):
-        return
-    terms.add(attr)
-
-
-def _is_useful_hint(phrase: str) -> bool:
-    """Check if a phrase is worth including as an ASR hint.
-
-    We want terms that ASR might misrecognize — medical jargon, Latin/Greek
-    terms, proper nouns, abbreviations. NOT phrases composed entirely of
-    common English words (ASR handles those fine).
-    """
-    phrase = phrase.strip()
-    if not phrase or len(phrase) < 3:
-        return False
-    # Skip pure numbers and size ranges
-    if re.match(r"^[<>≤≥]?\s*\d", phrase):
-        return False
-    # Skip very long phrases (>50 chars)
-    if len(phrase) > 50:
-        return False
-    # Skip phrases with too many words (>4)
-    word_count = len(phrase.split())
-    if word_count > 4:
-        return False
-    # Must contain at least one medical/uncommon word
-    return _has_medical_word(phrase)
-
-
-def _has_medical_word(phrase: str) -> bool:
-    """Check if a phrase contains at least one word ASR would struggle with."""
-    cleaned = re.sub(r"\([^)]*\)", "", phrase)
-    cleaned = re.sub(r"[<>≤≥/–—:,.'\"()]", " ", cleaned)
-    words = [w.strip().lower() for w in cleaned.split() if w.strip()]
-    if not words:
-        return False
-    for w in words:
-        if len(w) <= 2:
-            continue
-        if w in COMMON_WORDS:
-            continue
-        # If the word is not common English, it's likely medical jargon
-        return True
-    return False
-
-
 # ── CLI ──
 
 def main():
@@ -386,19 +185,12 @@ def main():
         csv_text = f.read()
 
     schema = build_schema(csv_text)
-    phrase_hints = extract_phrase_hints(schema)
 
     # Print schema
     print("=" * 60)
     print("EHR SCHEMA")
     print("=" * 60)
     print(json.dumps(schema, indent=2, ensure_ascii=False))
-
-    # Print phrase hints
-    print("\n" + "=" * 60)
-    print(f"PHRASE HINTS ({len(phrase_hints)} phrases)")
-    print("=" * 60)
-    print(json.dumps(phrase_hints, indent=2, ensure_ascii=False))
 
     # Print stats
     print("\n" + "=" * 60)
@@ -409,7 +201,6 @@ def main():
         len(d["sections"]) for d in schema["diseases"].values()
     )
     print(f"  Total sections: {total_sections}")
-    print(f"  Phrase hints: {len(phrase_hints)}")
     schema_json = json.dumps(schema, separators=(",", ":"), ensure_ascii=False)
     print(f"  Schema JSON size: {len(schema_json):,} bytes")
 

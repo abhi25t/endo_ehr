@@ -23,7 +23,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.websockets import WebSocketState
 
-from schema_builder import build_schema, extract_phrase_hints
+from schema_builder import build_schema
 from models import validate_llm_response
 
 # ── Logging ──
@@ -33,6 +33,18 @@ log = logging.getLogger("ehr-voice")
 # ── Paths ──
 PROJECT_DIR = Path(__file__).parent
 SRC_DIR = PROJECT_DIR / "src"
+PHRASESET_FILE = PROJECT_DIR / "endoscopy_phraseset.txt"
+
+
+def _load_phrase_hints() -> list[str]:
+    """Load phrase hints from endoscopy_phraseset.txt (one phrase per line)."""
+    if not PHRASESET_FILE.exists():
+        log.warning("Phrase set file not found: %s", PHRASESET_FILE)
+        return []
+    lines = PHRASESET_FILE.read_text(encoding="utf-8").splitlines()
+    hints = [line.strip() for line in lines if line.strip()]
+    log.info("Loaded %d phrase hints from %s", len(hints), PHRASESET_FILE.name)
+    return hints
 
 # ── App ──
 app = FastAPI(title="Endoscopy EHR Voice Server")
@@ -314,7 +326,7 @@ async def voice_ws(ws: WebSocket):
         csv_text = init_data.get("csv_text", "")
         if csv_text:
             session.ehr_schema = build_schema(csv_text)
-            session.phrase_hints = extract_phrase_hints(session.ehr_schema)
+            session.phrase_hints = _load_phrase_hints()
             log.info(
                 "Schema built: %d diseases, %d phrase hints",
                 len(session.ehr_schema.get("diseases", {})),

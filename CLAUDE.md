@@ -37,8 +37,9 @@ project/
 ├── server.py                   # FastAPI backend: serves frontend + WebSocket voice endpoint
 ├── asr_bridge.py               # Google Cloud STT v2 streaming bridge (async/thread)
 ├── llm_caller.py               # Gemini 2.5 Flash: transcript → EHR JSON updates
-├── schema_builder.py           # CSV → EHR schema JSON + ASR phrase hints extraction
+├── schema_builder.py           # CSV → EHR schema JSON for LLM context
 ├── models.py                   # Pydantic models for EHR report validation
+├── endoscopy_phraseset.txt     # Manually curated ASR phrase hints (one per line)
 ├── requirements.txt            # Python dependencies
 │
 ├── stream_test_mic.py          # Test script: verify Google Cloud STT with local mic
@@ -139,7 +140,7 @@ applyVoiceUpdate(report)
 | Transcript Batcher | `server.py:transcript_batcher()` | Debounce 1.5s, accumulate finals, pre-LLM filtering |
 | ASR Bridge | `asr_bridge.py` | Async→sync queue bridge, STT thread, auto-restart on 5min timeout |
 | LLM Caller | `llm_caller.py` | Gemini prompt construction, response parsing, lazy init |
-| Schema Builder | `schema_builder.py` | CSV → canonical schema JSON + phrase hints for ASR |
+| Schema Builder | `schema_builder.py` | CSV → canonical schema JSON for LLM context |
 | Pydantic Models | `models.py` | EHRReport, DiseaseEntry, SectionEntry validation |
 | Frontend Voice | `src/js/19-voice.js` | Audio capture, WebSocket client, applyVoiceUpdate(), UI |
 
@@ -185,7 +186,7 @@ applyVoiceUpdate(report)
 - **Model**: `chirp_3`
 - **Languages**: `["en-IN", "hi-IN", "te-IN"]`
 - **Sample rate**: 16kHz mono PCM Int16
-- **Phrase hints**: Extracted from CSV (medical jargon), max 500 per PhraseSet, boost=5.0
+- **Phrase hints**: Loaded from `endoscopy_phraseset.txt` (manually curated), max 1200 per PhraseSet, boost=5.0
 - **Auto-restart**: On 5-minute STT stream timeout (OutOfRange exception)
 
 ### LLM Configuration
@@ -526,7 +527,6 @@ Backend logging: Python `logging` module, logger name `"ehr-voice"`, level INFO.
 | `_voiceStart()` / `_voiceStop()` | `19-voice` | Start/stop dictation (audio + WebSocket) |
 | `voiceScheduleSync()` | `19-voice` | Debounced sync of manual edits to backend |
 | `build_schema(csv_text)` | `schema_builder` | CSV → canonical EHR schema dict |
-| `extract_phrase_hints(schema)` | `schema_builder` | Schema → medical jargon phrase list for ASR |
 | `call_llm(schema, report, remarks, transcript)` | `llm_caller` | Gemini call to update EHR from transcript |
 | `validate_llm_response(data, schema)` | `models` | Pydantic validation of LLM output |
 | `run_asr_bridge(ws, session)` | `asr_bridge` | Main ASR entry point (async task) |
@@ -566,9 +566,17 @@ python gemini_test.py
 ### Schema Builder CLI
 
 ```bash
-# Generate EHR schema + phrase hints from CSV
+# Generate EHR schema JSON from CSV (for inspection)
 python schema_builder.py EGD_Heirarchial_Menu-20260214.csv
 ```
+
+### ASR Phrase Hints
+
+`endoscopy_phraseset.txt` contains manually curated medical phrases (one per line, alphabetically sorted) that help Google Cloud STT recognize endoscopy jargon. The file was initially generated from the CSV but is now maintained by hand.
+
+- Edit the file directly to add/remove phrases
+- Google API limit: 1200 phrases per PhraseSet
+- `server.py` loads the file on each dictation session start
 
 ## Testing Checklist
 

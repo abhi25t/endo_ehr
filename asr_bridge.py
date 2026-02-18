@@ -38,7 +38,7 @@ STT_LOCATION = "asia-southeast1"
 MODEL = "chirp_3"
 LANGUAGE_CODES = ["en-IN", "hi-IN", "te-IN"]
 SAMPLE_RATE = 16000
-MAX_PHRASES_PER_SET = 500
+MAX_PHRASES_PER_SET = 1200
 
 
 def _build_phrase_set_inline(hints: list[str]) -> list[cloud_speech_types.SpeechAdaptation.AdaptationPhraseSet]:
