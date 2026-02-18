@@ -184,7 +184,7 @@ applyVoiceUpdate(report)
 
 - **Location**: `asia-southeast1`
 - **Model**: `chirp_3`
-- **Languages**: `["en-IN", "hi-IN", "te-IN"]`
+- **Languages**: `["en-IN", "hi-IN"]` (Chirp3 max 2 language codes)
 - **Sample rate**: 16kHz mono PCM Int16
 - **Phrase hints**: Loaded from `endoscopy_phraseset.txt` (manually curated), max 1200 per PhraseSet, boost=5.0
 - **Auto-restart**: On 5-minute STT stream timeout (OutOfRange exception)

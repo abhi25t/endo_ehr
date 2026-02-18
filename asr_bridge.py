@@ -36,7 +36,7 @@ log = logging.getLogger("ehr-voice")
 # ── Config ──
 STT_LOCATION = "asia-southeast1"
 MODEL = "chirp_3"
-LANGUAGE_CODES = ["en-IN", "hi-IN", "te-IN"]
+LANGUAGE_CODES = ["en-IN", "hi-IN"]
 SAMPLE_RATE = 16000
 MAX_PHRASES_PER_SET = 1200
 
