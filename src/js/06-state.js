@@ -14,5 +14,6 @@ let retroData = {
 
 let piiEnabled = false;
 let loadedCsvFilename = null;
+let loadedCsvText = null;
 let lastSavedReportState = null;
 let previousUhidSelection = '';

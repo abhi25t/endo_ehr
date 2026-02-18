@@ -284,12 +284,18 @@ async def call_llm_wrapper(session: SessionState, transcript: str) -> dict | Non
             transcript,
         )
         if result is None:
+            log.warning("LLM returned None for transcript: %s", transcript[:80])
             return None
+
+        log.info("LLM response: %d locations", len(result.get("report", {})))
 
         # Validate with Pydantic
         validated = validate_llm_response(result, session.ehr_schema)
         if validated is None:
-            log.warning("LLM response failed Pydantic validation")
+            log.warning(
+                "LLM response failed validation. Raw keys: %s",
+                list(result.keys()) if isinstance(result, dict) else type(result),
+            )
             return None
 
         return {

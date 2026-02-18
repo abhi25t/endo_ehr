@@ -193,4 +193,5 @@ function renderReport(){
   });
 
   refreshLeftHighlights();
+  if (typeof voiceScheduleSync === "function") voiceScheduleSync();
 }

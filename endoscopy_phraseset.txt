@@ -1,1312 +1,485 @@
 APC
-APC / thermal coagulation
-APC/fistula tract ablation
-Aberrant Pancreas
-Abnormal pit pattern revealed
-Abnormal vascular pattern
-Aborted due to risk
-Abrasion
-Acetic acid
-Acid hypersecretion (Zollinger–Ellison)
-Adenoma
+fistula tract ablation
+Acid hypersecretion 
+Zollinger–Ellison
 Adenomatous-suspicious
-Adequate closure achieved
-Adequate obliteration
-Adherant Clot
-Adherent clot
-Adherent clots
-Adherent mucus
+obliteration
+mucus
 Adjacent diverticulum or pouch
-Adjacent erosion/ulcer
-Adrenaline 1:10,000
-Adrenaline Injection
-After dilation
-Agent Used
-Air Insufflation Response
-Air bubbles / communication
-Air bubbling
-Airway compromise risk
+Adrenaline
 Akinetic
 Alligator forceps
-Altered Blood
-Ampulla visualized
+Ampulla
 Ampullary mass lesion
 Ampullary region
 Anastomosis
-Anastomosis Location
-Anastomotic Leak
-Anastomotic Site Seen
-Anastomotic Stricture
-Anastomotic Ulcer
+Anastomotic
 Ancillary_tests_ordered
 Angioectasia
-Angulation/kinking
-Antral nodularity
-Antral predominant
-Antral-predominant
+Angulation
+kinking
+Antral 
 Antrum
 Aortic aneurysm
-Approximate Size
-Areas Involved
-Argon plasma coagulation (APC)
-Aspiration event
-Aspiration/Regurgidation
-Associated Features
-Associated Findings
-Associated_features
+Argon plasma coagulation
+Aspiration
+Regurgidation
 Atrophic
-Atrophic islands
 Atrophic mucosa
-Atrophic-appearing mucosa
 Atrophy
 Atypical appearance
-Await biopsy
-Balloon
-Balloon Dilation
-Balloon Min to Max
-Balloon Size
-Balloon dilation (single)
-Balloon dilation performed
 Balloon tamponade
-Band Ligation (EVL)
+Band Ligation
+EVL
 Barrett’s mucosa
-Barrett’s mucosa adjacent
-Base Characteristics
-Battery injury zone
-Benign
 Bezoar
-Bezoar Size
-Bezoar Type
-Bezoar removal
 Bile
-Bile staining
-Bile-stained fluid
 Bilious fluid
-Biopsy from suspicious lesion
-Biopsy to “break” ring
-Bird-beak / pinhole
-Black-brown spots
-Bleeding / Stigmata
-Bleeding at band site
-Bleeding controlled
-Bleeding from staple line
-Bleeding of unknown origin
-Bleeding on contact
-Blood / oozing
+Bird-beak 
+pinhole
+Stigmata
 Blunted vascular pattern
-Bone
-Borderline / transition-zone visible
-Borders
 Bougie Dilation
 Bovine thrombin
-Branching/dilated vessels
-Broad, edematous folds
-Broad, featureless folds
-Broad-based indentation
 Bronchial compression
 Brunner’s gland hyperplasia
-Bulbar deformity / scarring
-Bulky / Enlarged
-CMV (Hint– large shallow)
-CMV / HSV
+Bulbar deformity
+CMV
+HSV
 CT Angio
-CT/MRI
 Candida
 Candidiasis
-Cannulation Attempted
+Cannulation
 Cap-assisted removal
-Capsule endoscopy
 Cardia
-Caustic Injury
-Cavitary space visible
-Cavity seen beyond mucosa
-Celiac-type mucosal injury
-Central dimple
+Celiac-type
 Central umbilication
-Cerebriform / gyriform pattern
-Cervical
-Cervical esophagus
-Cherry red spots
-Cherry-red spots (Venous congestion)
-Chest X-ray / CT
-Chest pain / odynophagia
+Cerebriform
+gyriform
+odynophagia
 ChromoEndoscopy
-Chronic ulcer
+Chronic
 Chylous effusion
-Circumferential
-Circumferential Extent
-Circumferential Involvement
-Classic linear “watermelon” stripes
-Classification
 Clean margins
 ClearFluid
-Clearance After Suction/Lavage
-Clip
-Clip for bleeding
-Clip placement
-Clot
-Clots
-Clustered
-Coagulation
+Lavage
 Coagulation Probe
 Coalescing
 Coeliac
-Coeliac Disease
-Coexisting stricture
-Coin/Metallic object
 Cold biopsy
-Cold disruption with forceps
 Cold snare
-Cold snare polypectomy
 Columnar mucosa tongues
 Combination therapy
-Combined
-Complete Ring
 Complete hemostasis
-Complete removal
-Completely obstructing
-Completeness / Post-removal assessment
-Compressible
-Concentration
-Concentric narrowing
-Confluent erosions
-Confluent red areas
-Congested / Edematous
-Congestive / venous duodenopathy
-Congestive / venous gastropathy
-Contact Bleeding
-Content
-Contents
-Contents / Drainage
-Contents / Leakage
-Controlled bleeding
-Corpus/body
-Corrosive
-Covered stent placement
-Cowden (PTEN)
-Cratered
+Edematous
+duodenopathy
+venous
+gastropathy
+Cowden
+PTEN
 Cricopharynx
-Crohn's Disease
 Crohn’s
-Cyanotic (Hint - congestive)
-Cyanotic mucosa (congestive pattern)
+Cyanotic
 Cyst
-D1 Bulb
+D1
+D2
 D1-D2 junction
-Debris/food retention
-Deep crater
 Deep mucosal defect
 Deep mural tear
 Deep ulcerations
-Defect Appearance
-Degenerative angioectasia (isolated, elderly-type)
+Degenerative angioectasia
 Dehiscence suspected
-Delayed bleeding
-Delayed emptying
-Delayed whitening
 Denture
 Depressed Lesions
-Depressed areas
-Depressed center
-Description
 Diaphragmatic pinch
 Dieulafoy Lesion
-Diffuse antral involvement
 Diffuse erythema
 Diffuse oozing
 Diffuse vascular ectasia pattern
-Diffuse whole-stomach involvement
-Diffused
-Dilated D1
-Dilated antrum
-Diluent
-Dilution
-Discharge from Ampulla
-Discolored
-Discrete, well-defined
 Disrupted glandular pattern
-Distal collapse
-Distance from incisors
-Distance from incisors: cm
-Distensibility With Insufflation
+Distensibility
+Insufflation
 Distorted anatomy
-Distribution
-Distribution Pattern
 Diverticulum
-Drainage catheter visualized (existing)
-Duodenal Bulb Deformity
-Duodenal Polyp
-Duodenal Ulcer
+Duodenal
 Duodenal Varices
-Duodenal bulb (D1)
-Duodenal folds normal
 Duodenopathy
-Duodenum D2
-Duodenum Specific
+Duodenum 
 Duplication cyst–like
 Dysphagia
 Dysplastic
-EMR planned
-ERCP planned
-EREFS (Endoscopic Reference Score)
-ESD planned
+EMR
+ERCP
+EREFS
+ESD
 EUS
-EUS correlation
-EUS recommended
-Easily passed
-Easily passes
-Easy
 Ectopic Pancreas
 Ectopic Sebaceous Glands
 Edema
 Edematous
-Edematous acute inflammation
-Edematous folds
-Edematous mucosa
-Edematous pylorus (acute setting)
-Edematous swelling
-Edematous villi
-Elevation Type
-Embedded in mucosa
-Empty
+villi
 En face
-Endoscopic Descriptors
-Endoscopic appearance
 Endoscopic band ligation
 Endoscopic suturing
-Endoscopic therapy
 Engorged
-Engorged vessels
 Enhanced Mucosal Features
 Enlarged mediastinal lymph nodes
 Eosinophilic Esophagitis
 Epiphrenic diverticulum
-Eroded
-Erosion
-Erosions
-Erosions / Injury
 Erythema
 Erythematous
-Erythematous rim
-Esophageal Course
-Esophageal Dilatation
-Esophageal Polyp
-Esophageal Ulcer
-Esophageal Varices
+Esophageal
 Esophageal Web
 Esophagitis
-Esophagitis Segment
-Esophagogastric (esophagectomy)
-Esophagojejunostomy (EJ)
+Esophagogastric
+esophagectomy
+Esophagojejunostomy
 Esophagus
 Ethanolamine oleate
 Etiology unclear
 Exophytic
-Exophytic impression
-Exposed muscle layers
-Exposed staple line
 Exposed sutures/staples
-Extent / Distribution
-Extent / Distribution Pattern
-Extrinsic Compression
-Extrinsic Compression Location
 Exudate
 Exudates
 FAP
-Failed removal
-Failure
 Faint staining
-Feeding Tube Placed
 Fibrin-coated / whitish slough
 Fibrinous
-Fibrinous patches
-Fibrinous slough
 Fibrotic
-Fibrotic rim
-Fibrotic/pale mucosa
 Fibrovascular polyp
-Final Implication
-Final Impression
-Findings AFTER STAINING
-Fine red punctate lesions
-Firm/fixed
 Fistula
-Fistulous opening / tract
-Fixed compression
-Flat elevation
-Flat-appearing
-Flat/indistinct
-Flattened
-Flattened / irregular pits
-Flattened / scalloped folds
-Flattened folds
+Fistulous
+scalloped folds
 Fluid stasis
 Flushed with irrigation
 Focal antral region
-Fold Appearance
-Fold Characteristics
-Folds
-Folds / Contour
-Follow-up endoscopy
-Follow-up recommendation
-Food
-Food debris
-Food particles
-Food particles (large amount)
-Food particles (small amount)
 Food pooling in pouch
-Food residue
-Food residue above obstruction
 Food residue above web
-Foreign Body
-Foreign body-related
 Forrest Classification
-Free-floating
-Fresh blood in stomach
 Friability
 Friable
 Friable edge
 Friable mucosa
-From Incisors
 Frothy secretions
-Full column treated
 Full-thickness perforation
-Functional Findings
-Fundal polyps (rare)
+Fundal polyps
 Fundic gland–type pattern
 Fundus
 Fungating
-Funnel-shaped antrum
-Funnel-shaped deformity
 Furrows
-Further imaging recommended
 GAVE
 GE Junction
-GE junction identified
-GEJ Appearance
-GEJ passing Resistance
+GEJ
 GIST
-Gallbladder / periportal mass
-Gaping defect with cavity
+periportal mass
+Gaping defect
 Gastric Contents
 Gastric Mucosal Atrophy
 Gastric Outlet Obstruction
-Gastric Polyp
-Gastric Ulcer
+GOO
+Gastric
 Gastric Varices
-Gastroduodenostomy (Billroth I)
-Gastrojejunostomy (Billroth II)
+gastritis
+Gastroduodenostomy
+Gastrojejunostomy
+Billroth
 Gastropathy
 General Appearance of Anastomosis
-Genetic testing recommendation
-Gentle dilation (balloon)
-Glass
 Globus sensation
-Glossy surface
-Glue Cast
-Glue Injection
-Glue/sealant
-Glue/sealant therapy
 Glycogen Acanthosis
 Gold probe
-Grade 0: No varices
-Grade 1: Small/straight
-Graft V Host Disease
-Granular
-Granular cell
+varices
 Granulating base
-Granulation / Hyperplastic Tissue
-Granulation tissue
-Grasping forceps
-Greater Curvature
+Granulation 
+Hyperplastic Tissue
+Granulation
 H. Pylori
-H. pylori related
-H. pylori–associated gastritis pattern
-H. pylori–like features
-HSV (Hint- small volcano-like)
-Head Size
-Head Width
-Healing ulcer scar
+HSV 
 Healthy mucosa
-Heater probe
 Hematin
-Hematin-stained
-Hematocystic spots
-Hemo Spray
-Hemoclip
-Hemoclips
+Hematocystic
+Hemo
 Hemorrhagic
-Hemospray
 Hemostasis
-Hemostasis (APC / coagulation)
-Hemostasis / Therapeutic Interventions
-Hemostasis Achieved
-Hemostasis performed
-Hemostasis status
-Hemostasis therapy
-Hemostatic powder
-Heterogeneous staining
 Hiatal hernia
 Hiatus Hernia
-Highlighted depression
-Highlighted nodularity
 Hills Grade
 Hills hiatus
 Histoacryl
 Hot snare
-Hot snare polypectomy
 Hourglass-type deformity
 Human thrombin
 Hypercontractile
 Hyperemic
-Hyperplastic polyp
-Hyperplastic-type pattern
+Hyperplastic
 Hypertrophic pyloric channel
 Hypoalbuminemia
 Hypomotile
 Hypoxia
-Hypoxia / instability
-IGV1 (Isolated fundal varices)
-II - Paraesophageal Hernia
-III
-III (Confluent/linear)
-III - Mixed/Combined
-III — Clean base
-IIa — Visible vessel
-IIb — Adherent clot
-IIc — Pigmented spot
-Ia — Spurting
-Iatrogenic perforation (instrument/scope)
-Ib — Oozing
+IGV1
+Isolated fundal varices
+Paraesophageal Hernia
+atrogenic perforation
 Idiopathic
-Idiopathic / nonspecific
-Ill-defined
-Imaging (enterography)
-Imaging recommended
-Immediate Post-Intervention Findings
-Immediate bleeding
-Immediate solidification seen
-Imminent rupture appearance
-Impassable
-InRoomActions
-Inadequate preparation
 Incisura
-Incomplete removal
-Incomplete ring
-Increased
-Indeterminate
-Indeterminate vascular lesion
-Indeterminate — requires histology
-Indication
-Indigo Carmine Contrast Enhancement
 Indigo carmine
-Infectious
-Infectious/inflammatory appearance
 Infective duodenitis
-Infiltration
-Infiltrative spread
-Inflamed / erythematous
-Inflammation signs
+Inflamed
+Inflammation
 Inflammatory
-Inflammatory ampullitis
-Inflammatory polyp
-Inflammatory swelling
-Inflammatory-type
-Injection
-Injection therapy
-Inlet Patch
-Inlet Patch Location
-Intervention / Management
-Interventional Radiology
-Interventional radiology referral
-Interventions
 Intestinal metaplasia
 Intraluminal obstruction
 Intravariceal injection
-Involvement of Esophageal Segment
-Iron-deficiency anemia
-Irregular Z-line length
-Irregular defect
-Irregular edges
-Irregular mound
-Irregular mucosa
-Irregular narrowing
-Irregular pit pattern
-Irregular uptake pattern
-Irregular vascular pattern
-Isp
-Juvenile
 Kimura–Takemoto Grade
-Known case
-Kodsi Classification Grade
-LES Resistance
-Landmarks
-Large cavitary
-Large mucosal tear
-Large sac-like varix
-Large transmural defect
+Kodsi
+LES
 Lavage
-Lavage / suction
-Lavage of cavity
-Left atrium enlargement
-Left main bronchus impression
+bronchus
 Leiomyoma
-Length
-Less than 50%
-Lesser Curvature
-Level of Obstruction
-Light Blue Crests (LBC)
-Likely Diagnosis
-Likely Etiology
-Likely Etiology / Pattern
-Likely Gastroparesis
-Linear
-Linear erosions
-Linear scratches
+Light Blue Crests
+LBC
 Linitis Plastica
 Linitis-like
 Lipoma
-Liver contour
 Lobulated
-Lobulated mass
-Lodged / impacted
-Long narrowed channel
-Long segment narrowing
-Loose/eroded staple
-Los Angeles Grading
-Loss of Folds
-Loss of pit density
-Loss of uptake area
-Loss of vascular pattern
 Lugol’s Iodine
-Lumen / Fold Appearance
-Lumen / Shape Changes
-Lumen / Shape Effects
-Lumen Characteristics
-Lumen Contents
-Lumen Diameter
-Lumen adequately widened
-Lumen narrowing in body
-Luminal Narrowing
-Luminal distortion
 Lymphangiectasia
 Lymphangiography
-Lymphangiography referral
 Lymphangioma
 Lymphopenia
 Lymphoscintigraphy
-MAP
 MR enterography
-Magnet retrieval
 Major papilla
-Malignancy suspected
-Malignant
-Malignant infiltration
-Malignant mass
-Malignant perforation
-Manufacturer-provided buffer
-Map-like metaplastic islands
-Mapping biopsy
-Margins
-Markedly thickened “giant” folds
-Mass adjacent to ulcer
-Mass effect / deformity
-Mass-like features
-Mass-like fold appearance
-Mass-like lesion
-Mass-like lesion causing narrowing
-Maximum Extent
 Mechanical GOO
-Mechanical clip
 Melanosis
-Metaplasia Indicators
-Method
-Methylene Blue Uptake
+Metaplasia
 Methylene blue
-Mid
-Mid-esophageal diverticulum
-Middle
-Middle Upper Body
-Mild erythema
-Mild narrowing (11–15 mm)
-Mild resistance
-Mildly tortuous
-Minimal distension
-Minor
-Minor bleeding
-Minor bleeding after dilation
-Minor bleeding post-biopsy
-Minor contact bleeding
-Minor mucosal tear
-Minor oozing
-Minor papilla
-Mixed
-Mobile with respiration
-Mobility / Consistency
-Moderate narrowing (9–10 mm)
-Moderate — slight resistance
-Monitor for perforation
-More than 50%
-Morphology of Deformity
-Mosaic / patchy redness
-Mosaic / snake-skin pattern
-Mosaic / snakeskin
-Mosaic Pattern
-Mosaic appearance
+erythema
+tortuous
+distension
+papilla
+Mosaic
+snake-skin
 Mucosa
-Mucosa Appearance
-Mucosa Around Ulcer
-Mucosa intact
-Mucosal Appearance Inside Diverticulum
-Mucosal Atrophy
-Mucosal Bridge
-Mucosal Features
-Mucosal Pattern
-Mucosal Surface Over Compression
-Mucosal denudation
-Mucosal descriptors
-Mucosal incision / division
-Mucosal patterns
-Mucosal tear
-Mucosal tear observed
-Mucus adherent film
-Mucus pooling
-Multifocal
-Multifocal erosions
-Multifocal lesions
-Multifocal linear pattern
-Multiple contiguous ulcers
-Multiple erosions
-Multiple large varices
-Multiple lesions
-Multiple openings
-Multiple papillomatous lesions
-Multiple parasites present
-Multiple pieces
-Multiple rings
-Multiple sequential balloon dilations
-Multiple small erosions
-Multiple webs
-Ménétrier Disease (Suspected)
+Mucosal
+Mucus
+papillomatous
+Ménétrier Disease
 N-butyl-2-cyanoacrylate
 NBI
-NBI Apperance
-NBI Microsurface Features
-NBI Microvascular Features
 NET
 NSAID
-NSAID / aspirin
 NSAID-related duodenopathy
 NSAID-related gastropathy
-Narrow-necked
-Narrowed
-Narrowed gastric body
-Narrowed lumen
-Narrowed segments
-Narrowest diameter
-Nature of Compression
-Near-obstructing
-Nearly circumferential web
 Necrosis
 Necrotic
-Necrotic base
-Necrotic debris
-Necrotic tissue
-Need for airway intervention
 Neoplastic
-Neoplastic mass causing narrowing
-Neuroendocrine tumor (polypoid)
-Next Therapy Planned
-Nipple
-Nipple sign
-No antegrade emptying
-No change
-No distension
-No immediate bleeding
-No improvement
-No leak
-No prominent varices
-No removal attempted
-No suspicious features
-No visible drainage
-No visible leakage
-No whitening
+Neuroendocrine
+polypoid
 Nodular
-Nodular / mass-like edge
-Nodular GAVE
-Nodular area
-Nodular/folded edge
 Nodularity
-Nodule (Mucosal)
 Non Traversable
-Non-compressible
-Non-dysplastic
-Non-pulsatile
-Non-staining suspicious zone
-Non-ulcerated
-Normal distension
-Normal distension (atypical)
-Normal expansion
-Normal intact mucosa
-Normal mucosa
-Normal saline
-Normal transit
-Normal-appearing mucosa
-Not assigning etiology
-Not specified
-Not suspected / unrelated
-Not traversable
-Notch-like indentation
-Number / Distribution
-Number of Bands
-Number of Columns
-Number of Injection Sites
-Number of Lumen
-Number of Ulcers
-Number of biopsies
-Number_estimate
-Nutritional consult
-OTSC
-Obstructing
-Occluded
-Old blood / hematin
-Old blood in stomach
+Non compressible
+Non dysplastic
+hematin
 Oozing
-Oozing from mucosa
-Oozing from red spots
-Open
-Opening Appearance
-Orientation / Impaction features
-Other Sampling
-Other ratio
-Others
-Oval
-Over-the-scope clip (OTSC)
-Overall
-Overall Severity
-Overlying keratinous appearance
-Overtube-assisted removal
+Over-the-scope clip
+OTSC
+keratinous
+Overtube
 Oxyntic-predominant
 PHG
 PHG-Polyp
-Pale / atrophic
-Pale elevated patches
-Pale mucosa
-Pale thin membrane
-Pancreatic Crest
-Pancreatic Rest
-Pancreatic head mass
+Crest
 Pangastric
 Papillary
-Parasite Appearance
-Parasite fragment / piece
-Parasites
-Paravariceal injection
-Paris Classification
-Partial closure
-Partial distension
-Partial improvement
-Partial improvement only
-Partial removal
-Partial semicircular web
-Partially disrupted
-Partially obstructing
-Partially treated
-ParticulateFood
-Passable
-Passage avoided
-Passes with mild resistance
-Passes with moderate resistance
-Patch of altered color
-Patch shape
-Patches of atrophic-looking mucosa
-Patchy erythema
-Patchy haemorrhagic mucosa
-Patchy uptake
-Patchy whitening
-Patchy whitish-grey plaques
-Patchy “map-like” atrophy
-Pathological vascular pattern
-Pathology correlation
-Patterns
+Paravariceal
+haemorrhagic
 Pedunculated
-Peptic stricture
-Peptic ulcer–related scarring
-Perforation
-Perforation suspected
-Periampullary diverticulum
-Periampullary diverticulum size
-Periampullary edema
+Peptic
+Periampullary
+edema
 Peristalsis
 Petechial
 Peutz-Jeghers
-Pharma
 Phytobezoar
-Pigmented spot
-Pill
-Pillow sign positive
-Pills/tablets
-Pin-point opening (<5 mm)
-Pinkish
-Pit pattern irregularity
-Plastic
-Plummer-Vinson–like features
+Pillow sign
+Plummer-Vinson–like
 Polidocanol
-Polyp/Inflammatory polyp at EGJ
 Polypoid
-Polypoid change
-Polyposis Syndrome
-Polyposis Syndrome Diagnosis
-Pooling of bile
-Pooling of secretions
-Poor / Persistent residue
-Poor distension (classic)
-Poor distension of fundus/body
-Poor expansion
-Poor peristaltic movement
+Polyposis
+Poor distension
+peristaltic
 Portal Hypertensive Duodenopathy
 Portal hypertensive gastropathy
-Portal hypertensive gastropathy (PHG)
-Portal hypertensive–associated
+PHG
+Portal hypertensive
 Post Cricoid Web
-Post EVL Complication
-Post EVL Scarring
-Post Operative Appearance
-Post Surgical Changes
-Post-EVL ulcers
-Post-Intervention Findings
-Post-Intervention Notes
-Post-Procedure Notes
-Post-biopsy
-Post-dilation
-Post-endoscopic therapy
-Post-intervention bleeding
-Post-procedure Plan
-Post-removal Inspection
-Post-sclerotherapy / EVL
-Post-surgical
-Post-surgical / anastomotic
-Post-surgical anastomosis (gastrojejunostomy)
-Post-surgical hyperplasia
-Post-surgical leak
-Post-surgical stricture
-Post-ulcer
-Pouch outlet narrowing
-Pouch-like
+Post EVL
+Post-sclerotherapy
+EVL
+anastomotic
+anastomosis
+gastrojejunostomy
+hyperplasia
 Prague Classification
-Pre-staining Assessment
-Predominantly body/fundus
-Premature band dislodgement
 Prepyloric antrum
-Prepyloric region
-Presence
-Pressure injury (battery)
 Prestenotic dilation
 Procedural Notes
 Procedure aborted
 Prominent collecting venules
-Prominent congested vessels (non-telangiectatic)
-Prominent gastric folds
-Prominent mucosal ridges
-Prominent submucosal channels
-Prominent submucosal vessels
-Prominent vein
-Prominent veins
-Protein-losing appearance (excess mucus)
-Protein-losing enteropathy
-Proximal Findings
-Proximal esophagus
-Proximal extension
+non-telangiectatic
+enteropathy
 Pseudo-diverticulum
-Pseudomembranes or Adherent Debris
+Pseudomembranes
 Pseudopolypoid projections
 Puckered
 Pulsatile
-Pulsatile impression
 Punctate
-Punctate pattern
-Punctate red spots
-Purulent drainage
+Purulent
 Pus
-Pus / purulent discharge
-Push technique (into stomach)
-Pyloric Patency
-Pyloric Stenosis
-Pyloric channel
-Pyloric channel narrowing
-Pyloric narrowing
-Pylorospasm / functional narrowing
+purulent
+Pyloric
+Stenosis
+Pylorospasm
 Pylorus
-Qualifier
-Radiation
-Radiation gastropathy
-Radiation injury
-Radiation-induced (chronic, fibrotic edges)
-Radiation-related changes
-Radiofrequency ablation
-Ragged margins
-Raised margins
-Raised proliferative tissue
-Raised/rolled edges (Hint- suspicious)
-Rapid growth
+proliferative
 Rapid urease test
 Rat-tooth forceps
-Reactive / chemical duodenitis
+duodenitis
 Recombinant thrombin
-Recommend correlation with histology
-Recommend medical therapy optimization
-Recommend repeat dilation
-Recommended followup
-Recommended_followup
+histology
 Red Signs
 Red wale marks
 Reddish
 Reduced brown glandular pattern
-Referred to
-Reflux Esophagitis/GERD
-Reflux-Related Complications
-Reflux-related (distal, with esophagitis)
-Refluxing bile
-Relook Endoscopy
-Removal
-Renal mass
-Repeat endoscopy
-Residual
-Residual fragments seen
-Residual large varices
-Residual tissue suspected
-Retained fluid
-Retained fluid/mucus
-Retained food
-Retained food requiring washing
-Retained food/fluid
-Retained suture material
-Retrieval abandoned for safety
+Reflux
+Esophagitis
+GERD
+esophagitis
+Refluxing
+suture
 Ridging
-Rigid, non-distensible folds
-Rigid, nondistensible wall
-Ring Characteristics
-Ring fully disrupted
-Rings
-Rolled edge
-Rolling sign positive
+distensible
 Roth net
-Round/oval
-Rule out dysplasia
-SIEWERT Classification
-STK11
-Saliva / GI contents
-Saliva pooling
-Saliva pooling (esophageal)
-Salmon Color Mucosa
-Salmon-colored
+dysplasia
+SIEWERT
+STK 11
+Saliva
+Salmon
 Savary-Gilliard
-Savary-Gilliard Min to Max
 Scalloped Mucosa
 Scalloping
 Scalloping of Folds
 Scarring
-Scarring / fibrosis
-Scarring causing rigid lumen
-Scattered erosions
+fibrosis
 Schatzki Ring
-Sclerosant Used
-Sclerosis/scarring
+Sclerosant
+Sclerosis
 Sclerotherapy
-Scope Passage
-Scope Traversability
-Scope Traversed Pylorus
-Scope bypasses diverticulum easily
-Scope enters diverticulum inadvertently
-Secondary Signs
-Secretions / Exudate
-Secretions / Exudates
-Segment length/size
+Exudate
+Exudates
 Semi-pedunculated
-Sequential balloon dilation
-Serology (albumin)
-Serrated polyp
+Serology
+albumin
+Serrated
 Sessile
-Sessile mound
-Session Outcome
-Severe luminal narrowing
-Severe — tight passage
-Severity
-Severity of Luminal Narrowing
-Severity of Narrowing
-Shallow ulcerations
-Shape
-Shape / Contour
-Shape / Margins
-Sharp end pointing distally
-Sharp end pointing proximally
-Sharp focal indentation
-Sharp object
-Sharply defined atrophic border
-Short membranous shelf
-Short tight ring
-Sigmoid / markedly tortuous
-Significant oozing controlled
-Significant residue above anastomosis
-Significant resistance
-Similar nodules
-Size / Extent
-Size / Form (F-classification)
-Size Estimate
-Size of Largest
-Size of Largest Erosion
-Size of Largest Ulcer
-Size of Largest diverticulum
-Slight mucosal nodularity
-Slit-like
+F-classification
+Nodularity
 Slough
-Slough-covered base
-Small abrasion
-Small mucosal tear (post-intervention)
-Small pinpoint
-Small pinpoint perforation
-Small whitish nodules
-Small, round, well-defined
-Smooth dome-shaped bulge
-Smooth edges (Hint- benign-appearing)
-Smooth flat margins
-Smooth mucosa
-Smooth shiny surface
-Smooth, round, well-defined
 Snare
-Snare removal
-Sodium tetradecyl sulfate (STS)
-Soft diet
-Solid Food
-Source
-Specific Lesions
-Specify Reason
-Specimen count
-Specimen sent for identification
+Sodium tetradecyl sulfate
+STS
 Sphincterotomy
 Spigelman score
-Splenic mass
-Spontaneous
-Spontaneous bleeding
-Spotty red spots
+Splenic 
 Spurting
-Spurting arterial-type bleed
-Squamous papilloma (Esophageal papilloma)
-Stain Used
-Stalk Size
-Stalk Width
-Staple/Suture Findings
-Staples visible
-Stasis Esophagitis
-Stasis fluid / debris
+Squamous
+papilloma
+Stalk
 Stent
-Stent placed
-Stent placement
 Stigmata
-Stigmata of recent bleed
-Stigmata of recent bleeding
-Stool contamination
-Stool fat
-Straight
-Stress ulcer
-Stress-related
-Stress-related gastropathy
-Stress-related inflammation
 Stricture
-Stricture on follow-up
-Stricture proximal to ulcer
 Strictures
-Submucosal / Subepithelial Lesions
-Submucosal elevation
-Submucosal tunnel
-Submucosal tunneling
-Subtle dilated vessels
-Subtle nodularity
-Successful dilation
-Suction
-Suction removal
-Superficial ulcerations
-Surface Architecture
-Surface Lesions
-Surface Mucosa
-Surface erosion
-Surgery
-Surgery consult
-Surgical referral
-Surgical sutures/staples
-Surrounding Mucosa
-Surrounding duodenitis
-Surrounding gastritis
-Surrounding inflammation/esophagitis
-Surrounding mucosa stains normally
-Surrounding pseudomembrane (Hint- infectious)
-Suspected Barrett's esophagus
-Suspected Esophageal Motility Disorder/Achalasia
-Suspected Etiology
-Suspected Etiology Pattern
-Suspected Histologic Type
-Suspected organism
-Suspected perforation
-Suspected tumor/polyp inside
-Suspicion of Underlying Cause
-Suspicious Features
-Suspicious ampullary lesion
-Suspicious defect
-Suspicious for early carcinoma
-Suspicious for high-grade dysplasia
-Suspicious for low-grade dysplasia
+Subepithelial
+Submucosal
+nodularity
+ulcerations
+Lesions
+Mucosa
+duodenitis
+esophagitis
+pseudomembrane
+Barrett's esophagus
+Motility
+Achalasia
+Histologic
+ampullary
+carcinoma
+dysplasia
 Suturing
-Symptoms
 Syndromic polyposis pattern
 Tangential
-Targeted Biopsy Plan
-Targeted biopsy
 Tattooing
-Technique
 Telangiectasia
-Temporary stent placement
-Tense / Rounded
-Tertiary Contraction
-Texture
-Therapeutic Intervention
-Thermal
-Thickened fixed folds
-Thickened folds
-Thickened ring
-Thin mucosal membrane
-Thin mucosal ring
 Thoracic
-Thrombin Injection
-Thrombin Source
-Through-the-scope clips
-Through-the-scope dilation
-Thyroid enlargement
-Tight but passable
-Tight ring-like stenosis
-Tight web (5-8 mm)
-Tongue like projection
+Thrombin
+Thyroid
+stenosis
 Tortuous
-Tortuous, deeply grooved folds
-Total Volume Delivered
-Trabeculated inner surface
-Tracheal compression (proximal)
+Trabeculated
+Tracheal compression
 Transparent mucosa
-Trauma
 Traumatic
 Traversability
-Treated lesions visibly coagulated
-Treated varix appears hard/solid
 Triamcinolone injection
 Tricho
-Tripod / polyp forceps
-Tubular stomach
-Tumor / Mass
-Tumor infiltration appearance
-Twisted / angulated lumen
-Type 1- Regular
-Type of Anastomosis
-Type of Defect
-Type of Papilla
+Anastomosis
+Papilla
 Ulcer
-Ulcer Characteristics
-Ulcer Location
-Ulcer Present
-Ulcer at GEJ
-Ulcer on polyp head
-Ulcer on top
-Ulcer-based
-Ulcer-based perforation
 Ulcerated
-Ulcerated margin
 Ulceration
 Ulcers
-Ulcers adjacent
-Unable to close endoscopically
-Unable to dilate
-Unable to pass
-Unable to retrieve
-Unclear / multiple levels
-Undermined / overhanging edges
-Undiluted
-Uneven pooling
-Unidentified object
-Unidentified worm-like structure
-Uniform blue staining
-Uniform thickening
-Uniform whitening (normal)
-Upper esophageal sphincter region
+endoscopically
+sphincter
 Variceal Grade
-Variceal Grade of Columns
 Varices
 Varix
-Vascular / Suspicious Features
-Vascular Features
-Vascular Transparency
-Vascular irregularity
-Vascular pattern abnormal
-Vascular patterns
 Velvety
 Vesicular
-Vessel appearance
-Villous/frond-like
-Visible Vessel
-Visible defect / cavity
+Villous
+frond-like
 Visible peristalsis
-Visible stent (migration)
-Visual Characteristics
-Visual Consistency
-Visualization
-Volume
-Volume Injected
-Volume Per Injection
-Wall Characteristics
-Weak / sluggish
-Web successfully disrupted
-Well-defined
-Well-demarcated
-Well-demarcated border
-White Opaque Substance (WOS)
+Visible stent
+sluggish
+White Opaque Substance
+WOS
 White slough
-White spots
 Whitish villi
-Whole Stomach
-Whole esophagus
-Wide opening (>15 mm)
-Wide-mouthed
 Xanthoma
-Yellow / yellowish-white spots
-Yellow or yellow-white plaque
-Yellow-white exudate
-Z-Line / Columnar Mucosa
 Z-line
 Zargar Severity Score
-Zenker’s diverticulum (pharyngoesophageal)
+Zenker’s diverticulum
 anastomotic
-bleeding stigmata
-button battery
-by Pediatric Scope
-by catheter
-by wire
-concentric/annular
-diffuse whitening
-eccentric
-erosion/ulcer
-established
+stigmata
+Pediatric Scope
+catheter
+erosion
+ulcer
 fibrosis
 forceps
 furrow
-hourglass
-malignant (tumor)
-membraneous web
-mucosal breaks
-mucosal thickening
-need for dilation
-peptic/GERD-related
+mucosal
 petechiae
-plaques
-post caustic injury
-postoperative
-repeat EGD at days
-ring
-ulcer perforation
-“Leather bottle” appearance
+Etiology
+cavitary
+ampullitis
+varix
+erythematous
+histology
+enterography
+punctate
+Gastroparesis
+exudate
+mucosa
+pharyngoesophageal

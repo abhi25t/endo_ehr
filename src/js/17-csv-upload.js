@@ -20,6 +20,7 @@ document.getElementById("csvFile").addEventListener("change", e => {
   r.onload = () => {
     try {
       log('CSV file read complete, parsing...');
+      loadedCsvText = r.result;
       const rows = parseCSV(r.result);
       if(rows.length === 0){
         logWarn('CSV parsing returned no valid rows');
@@ -52,6 +53,7 @@ Caustic Injury,Time_since_ingestion,,Upper,,single,,Time elapsed since ingestion
 Tumor Sample,Size,,Upper,,single,,Enter size.,,x,x,x,x,"float_box cm",,
 Simple Distance,Distance from incisors,,Upper,,single,,Distance only.,,x,,,,"int_box",,
 `;
+  loadedCsvText = sample;
   const rows = parseCSV(sample);
   buildFromCSV(rows);
   populateColumns();

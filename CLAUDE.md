@@ -59,18 +59,18 @@ project/
         ├── 03-hint-helpers.js  # createHintElement()
         ├── 04-input-helpers.js # parseAttributePattern(), groupHasAnyValue(), renderGroupLabel()
         ├── 05-constants.js     # SUBLOCATIONS, STOMACH/DUODENUM matrices, VIDEO_EXTENSIONS, FPS
-        ├── 06-state.js         # All mutable globals (DISEASES, report, active, retroData, etc.)
+        ├── 06-state.js         # All mutable globals (DISEASES, report, active, retroData, loadedCsvText, etc.)
         ├── 07-conditional-logic.js  # evaluateSingleCondition(), evaluateConditional()
         ├── 08-disease-columns.js    # populateColumns(), refreshLeftHighlights()
         ├── 09-sublocation-ui.js     # renderSubLocChips(), renderSublocMatrix(), toggle functions
         ├── 10-disease-management.js # addOrOpenDisease(), openDetails(), frame data handlers
         ├── 11-details-pane.js       # renderDetailsSections(), renderRow(), renderInputAttribute(), makePill()
-        ├── 12-report-pane.js        # renderReport()
+        ├── 12-report-pane.js        # renderReport() + voiceScheduleSync() hook
         ├── 13-retro-video.js        # Video folder loading, UHID/video selection, frame calc, PII
         ├── 14-json-io.js            # loadJsonFromText() (unified JSON loader)
         ├── 15-pdf-generation.js     # generateTimestamp(), generatePDF()
         ├── 16-save-report.js        # Save and Clear button handlers
-        ├── 17-csv-upload.js         # CSV file handler, sample loader, JSON file load handler
+        ├── 17-csv-upload.js         # CSV file handler (stores loadedCsvText), sample loader, JSON file load
         ├── 18-init.js               # Init IIFE
         └── 19-voice.js             # Voice dictation: audio capture, WebSocket, applyVoiceUpdate(), UI
 ```
@@ -201,8 +201,16 @@ applyVoiceUpdate(report)
 ### Manual Edit Sync
 
 When the user makes manual edits while voice is active:
+- `renderReport()` calls `voiceScheduleSync()` at the end (if voice module loaded)
 - `voiceScheduleSync()` debounces (500ms) and sends `report_state` message to backend
 - Backend updates `session.current_report` so next LLM call uses fresh state
+
+### CSV Text Flow for Voice
+
+`loadedCsvText` (global in `06-state.js`) stores raw CSV text for the backend:
+- Set by `17-csv-upload.js` in both file upload handler and sample loader
+- Sent to backend in the WebSocket `init` message by `19-voice.js`
+- Backend uses it to build the EHR schema via `schema_builder.py`
 
 ## Layout Structure
 
@@ -467,7 +475,7 @@ EHRReport
 └── overallRemarks: str
 ```
 
-Validation pipeline: Parse JSON → Pydantic model_validate → strip invalid locations → validate disease names against schema → remove hallucinated diseases.
+Validation pipeline: Parse JSON → Pydantic model_validate → strip invalid locations → validate disease names against schema → validate disease-location compatibility (e.g., reject "Esophageal Varices" under "Stomach") → remove hallucinated/misplaced diseases.
 
 ## CSS Classes
 
@@ -492,6 +500,9 @@ Validation pipeline: Parse JSON → Pydantic model_validate → strip invalid lo
 5. ✅ Clear button resets UHID/Video
 6. ✅ UHID change warns only for unsaved changes
 7. ✅ Previous UHID selection restored on cancel
+8. ✅ `loadedCsvText` shared via `06-state.js` (was duplicated/lost between `17-csv-upload.js` and `19-voice.js`)
+9. ✅ `voiceScheduleSync()` wired to `renderReport()` (was defined but never called)
+10. ✅ Disease-location validation in `models.py` (LLM could place diseases under wrong locations)
 
 ## Development Notes
 

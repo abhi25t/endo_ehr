@@ -15,7 +15,6 @@ let voiceWs = null;            // WebSocket instance
 let voiceAudioCtx = null;      // AudioContext (16kHz)
 let voiceMediaStream = null;   // getUserMedia stream
 let voiceActive = false;       // Dictation running
-let loadedCsvText = null;      // Raw CSV text (stored on CSV load)
 
 // ── applyVoiceUpdate ──
 
@@ -400,18 +399,7 @@ function _voiceCheckEnabled() {
 }
 
 // ── Manual Edit Sync ──
-// Wrap renderReport to notify backend of manual edits
-
-const _origRenderReport = typeof renderReport === "function" ? renderReport : null;
-
-if (_origRenderReport) {
-  // We don't overwrite renderReport directly since it would cause recursion
-  // in applyVoiceUpdate. Instead, we hook into user-driven edits via a
-  // MutationObserver-free approach: sync on a short debounce after renderReport.
-  // The backend already gets report_state messages.
-}
-
-// Debounced sync: called after manual edits to send state to backend
+// Debounced sync: called from renderReport() to send state to backend
 let _voiceSyncTimer = null;
 function voiceScheduleSync() {
   if (!voiceActive) return;
@@ -438,28 +426,13 @@ function voiceScheduleSync() {
   // Check enabled state initially and when CSV loads
   _voiceCheckEnabled();
 
-  // Hook into CSV load to store raw CSV text and re-check enabled state
+  // Re-check enabled state when CSV loads (loadedCsvText stored in 17-csv-upload.js)
   const csvInput = document.getElementById("csvFile");
   if (csvInput) {
-    csvInput.addEventListener("change", (e) => {
-      const f = e.target.files[0];
-      if (!f) return;
-      const reader = new FileReader();
-      reader.onload = () => {
-        loadedCsvText = reader.result;
-        // Re-check after a tick (CSV processing in 17-csv-upload.js runs first)
-        setTimeout(_voiceCheckEnabled, 100);
-      };
-      reader.readAsText(f);
-    });
+    csvInput.addEventListener("change", () => setTimeout(_voiceCheckEnabled, 100));
   }
-
-  // Re-check when DISEASES might be populated (after sample load)
   const sampleBtn = document.getElementById("loadSample");
   if (sampleBtn) {
-    sampleBtn.addEventListener("click", () => {
-      loadedCsvText = null; // Sample doesn't have raw CSV text for backend
-      setTimeout(_voiceCheckEnabled, 100);
-    });
+    sampleBtn.addEventListener("click", () => setTimeout(_voiceCheckEnabled, 100));
   }
 })();

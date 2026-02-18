@@ -95,6 +95,8 @@ def validate_llm_response(data: dict, schema: dict | None = None) -> EHRReport |
                 for disease_name in list(loc_entry.diseases.keys()):
                     if disease_name not in valid_diseases:
                         del loc_entry.diseases[disease_name]
+                    elif loc_name not in schema["diseases"][disease_name].get("locations", []):
+                        del loc_entry.diseases[disease_name]
                 # Remove empty locations
                 if not loc_entry.diseases:
                     del parsed.report[loc_name]
