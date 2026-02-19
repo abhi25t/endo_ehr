@@ -1,4 +1,4 @@
-# AIG Endoscopy EHR Prototype
+# Endoscopy EHR Prototype
 
 ## Project Overview
 

@@ -1,8 +1,6 @@
-# AIG Endoscopy EHR
+# Endoscopy EHR
 
 A real-time, voice-powered Electronic Health Record system for endoscopy procedures. Doctors speak naturally during procedures while the app listens, understands, and fills in structured medical findings automatically.
-
-Built for the **Asian Institute of Gastroenterology (AIG)**, one of the largest gastroenterology centers in the world.
 
 ---
 
@@ -233,4 +231,4 @@ python3 build.py
 
 ## License
 
-Internal project — Asian Institute of Gastroenterology (AIG), Hyderabad, India.
+Internal project — not for production use.
