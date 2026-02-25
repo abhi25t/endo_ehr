@@ -1,3 +1,55 @@
+/* ---------- CSV auto-load ---------- */
+
+async function autoLoadCsv() {
+  const isHttp = window.location.protocol === 'http:' || window.location.protocol === 'https:';
+
+  const urls = isHttp
+    ? ['/api/csv']
+    : ['./EHR_Menu - 20260224.csv', '../EHR_Menu - 20260224.csv'];
+
+  for (const url of urls) {
+    try {
+      const resp = await fetch(url);
+      if (!resp.ok) continue;
+
+      const text = await resp.text();
+      if (!text || text.length < 20) continue;
+
+      loadedCsvText = text;
+
+      // Try to extract filename from Content-Disposition header or URL
+      const cd = resp.headers.get('content-disposition');
+      const filenameMatch = cd && cd.match(/filename="?([^";\n]+)"?/);
+      loadedCsvFilename = filenameMatch ? filenameMatch[1] : url.split('/').pop();
+
+      const rows = parseCSV(text);
+      if (rows.length === 0) {
+        log('Auto-loaded CSV had no valid rows');
+        continue;
+      }
+
+      buildFromCSV(rows);
+      populateColumns();
+      renderSubLocChips();
+      renderReport();
+
+      const noteEl = document.getElementById('csvNote');
+      if (noteEl) noteEl.textContent = 'CSV auto-loaded (' + rows.length + ' rows) - ' + loadedCsvFilename;
+
+      const statusEl = document.getElementById('csvAutoStatus');
+      if (statusEl) statusEl.textContent = 'Auto-loaded: ' + loadedCsvFilename;
+
+      log('CSV auto-loaded:', loadedCsvFilename, rows.length, 'rows');
+      return true;
+    } catch (err) {
+      log('CSV auto-load attempt failed for', url, ':', err.message);
+    }
+  }
+
+  log('CSV auto-load: no source succeeded, manual upload available in settings');
+  return false;
+}
+
 /* ---------- CSV upload, sample, and JSON file load ---------- */
 
 document.getElementById("csvFile").addEventListener("change", e => {

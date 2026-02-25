@@ -53,6 +53,7 @@ document.getElementById("saveJSON").onclick = async () => {
         gender: prospectivePatient.gender || null,
         age: prospectivePatient.age || null,
         indication: prospectivePatient.indication || null,
+        procedureType: procedureType,
         csvFile: loadedCsvFilename || null,
         savedAt: new Date().toISOString()
       },
@@ -103,6 +104,7 @@ document.getElementById("saveJSON").onclick = async () => {
         endFrame: endFrame ? parseInt(endFrame, 10) : null,
         segmentationFrame: segmentationFrame ? parseInt(segmentationFrame, 10) : null,
         pii: piiEnabled,
+        procedureType: procedureType,
         csvFile: loadedCsvFilename || null,
         savedAt: new Date().toISOString()
       },

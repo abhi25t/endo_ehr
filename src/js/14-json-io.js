@@ -132,6 +132,23 @@ function loadJsonFromText(text, filename, restoreUhidVideo) {
       report = tempReport;
     }
 
+    // Auto-detect procedure type from report locations or metadata
+    const metaProcedure = (parsedAll.__retroMeta && parsedAll.__retroMeta.procedureType)
+      || (parsedAll.__prospMeta && parsedAll.__prospMeta.procedureType);
+    if (metaProcedure && metaProcedure !== procedureType && typeof applyProcedureType === 'function') {
+      applyProcedureType(metaProcedure);
+    } else if (!metaProcedure) {
+      // Heuristic: detect from location keys
+      const reportLocs = Object.keys(parsedAll.report || report);
+      const isColono = reportLocs.some(l => COLONO_LOCATIONS.includes(l));
+      const isEndo = reportLocs.some(l => ENDO_LOCATIONS.includes(l));
+      if (isColono && !isEndo && procedureType !== 'colonoscopy' && typeof applyProcedureType === 'function') {
+        applyProcedureType('colonoscopy');
+      } else if (isEndo && !isColono && procedureType !== 'endoscopy' && typeof applyProcedureType === 'function') {
+        applyProcedureType('endoscopy');
+      }
+    }
+
     // Normalize sublocations
     Object.keys(report).forEach(loc => {
       const ds = report[loc].diseases || {};

@@ -22,7 +22,7 @@ function renderSubLocChips(){
   }
 
   // Standard pill layout for other locations
-  const options = SUBLOCATIONS[selectedMainLoc] || [];
+  const options = getSublocationsForLocation(selectedMainLoc) || [];
 
   options.forEach(s => {
     const chip = document.createElement("button");

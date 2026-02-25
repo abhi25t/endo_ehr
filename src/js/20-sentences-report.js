@@ -78,7 +78,7 @@ function _sentencesCreateModal() {
   const header = document.createElement('div');
   header.className = 'flex justify-between items-center px-6 py-4 border-b shrink-0';
   header.innerHTML =
-    '<h2 class="text-xl font-bold text-gray-800">Endoscopy Sentences Report</h2>' +
+    '<h2 class="text-xl font-bold text-gray-800">' + (procedureType === 'colonoscopy' ? 'Colonoscopy' : 'Endoscopy') + ' Sentences Report</h2>' +
     '<button id="sentencesCloseBtn" class="text-gray-500 hover:text-gray-800 text-2xl leading-none">&times;</button>';
   modal.appendChild(header);
 
@@ -193,7 +193,7 @@ async function _sentencesGeneratePdf() {
     // Title
     var title = document.createElement('h1');
     title.style.cssText = 'text-align: center; color: #1e40af; font-size: 18pt; margin-bottom: 16px;';
-    title.textContent = 'AIG Endoscopy Report';
+    title.textContent = procedureType === 'colonoscopy' ? 'AIG Colonoscopy Report' : 'AIG Endoscopy Report';
     printDiv.appendChild(title);
 
     // Quill content

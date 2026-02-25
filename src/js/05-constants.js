@@ -1,10 +1,42 @@
 /* ---------- constants ---------- */
+
+// Location columns for each procedure type
+const ENDO_LOCATIONS = ['Esophagus', 'GE Junction', 'Stomach', 'Duodenum'];
+const COLONO_LOCATIONS = [
+  'Terminal Ileum', 'IC Valve', 'Caecum', 'Ascending Colon',
+  'Transverse Colon', 'Descending Colon', 'Sigmoid', 'Rectum', 'Anal Canal'
+];
+
+function getLocationsForProcedure(type) {
+  return (type || procedureType) === 'colonoscopy' ? COLONO_LOCATIONS : ENDO_LOCATIONS;
+}
+
+// Endoscopy sub-locations
 const SUBLOCATIONS = {
   'Esophagus':['Cricopharynx','Upper','Middle','Lower','Whole esophagus','Anastomosis'],
   'GE Junction':['Z-line','Hiatal hernia','Diaphragmatic pinch'],
   'Stomach': null, // Stomach uses matrix layout - see STOMACH_SUBLOC_MATRIX
   'Duodenum': null // Duodenum uses matrix layout - see DUODENUM_SUBLOC_MATRIX
 };
+
+// Colonoscopy sub-locations (only Rectum has sub-locations)
+const COLONO_SUBLOCATIONS = {
+  'Terminal Ileum': [],
+  'IC Valve': [],
+  'Caecum': [],
+  'Ascending Colon': [],
+  'Transverse Colon': [],
+  'Descending Colon': [],
+  'Sigmoid': [],
+  'Rectum': ['Anterior wall', 'Posterior wall', 'Right Lateral wall', 'Left Lateral wall'],
+  'Anal Canal': []
+};
+
+function getSublocationsForLocation(loc) {
+  if (SUBLOCATIONS[loc] !== undefined) return SUBLOCATIONS[loc];
+  if (COLONO_SUBLOCATIONS[loc] !== undefined) return COLONO_SUBLOCATIONS[loc];
+  return [];
+}
 
 // Stomach sub-location matrix structure
 const STOMACH_SUBLOC_MATRIX = [

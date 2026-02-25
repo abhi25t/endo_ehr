@@ -52,7 +52,11 @@ class LocationEntry(BaseModel):
     diseases: dict[str, DiseaseEntry] = {}
 
 
-VALID_LOCATIONS = {"Esophagus", "GE Junction", "Stomach", "Duodenum"}
+VALID_LOCATIONS = {
+    "Esophagus", "GE Junction", "Stomach", "Duodenum",
+    "Terminal Ileum", "IC Valve", "Caecum", "Ascending Colon",
+    "Transverse Colon", "Descending Colon", "Sigmoid", "Rectum", "Anal Canal",
+}
 
 
 class EHRReport(BaseModel):

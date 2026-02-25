@@ -95,7 +95,7 @@
 </head>
 <body class="bg-gray-100 text-gray-800">
 <div class="max-w-full mx-auto p-6 relative">
-  <h1 class="text-2xl font-bold text-center text-blue-700 mb-6">AIG Endoscopy Report</h1>
+  <h1 id="pageTitle" class="text-2xl font-bold text-center text-blue-700 mb-6">AIG Endoscopy Report</h1>
 
   <!-- Settings Gear Button -->
   <div class="absolute top-6 right-6 z-50">
@@ -103,6 +103,18 @@
       &#9881;
     </button>
     <div id="settingsPanel" class="hidden absolute right-0 mt-2 w-72 bg-white rounded-lg shadow-lg border p-4 z-50">
+      <!-- Procedure Type -->
+      <div class="mb-4 pb-3 border-b">
+        <div class="text-sm font-medium text-gray-700 mb-2">Procedure Type</div>
+        <div class="flex gap-4">
+          <label class="flex items-center gap-1.5 text-sm cursor-pointer">
+            <input type="radio" name="procedureType" value="endoscopy" checked class="accent-blue-600" /> Endoscopy
+          </label>
+          <label class="flex items-center gap-1.5 text-sm cursor-pointer">
+            <input type="radio" name="procedureType" value="colonoscopy" class="accent-blue-600" /> Colonoscopy
+          </label>
+        </div>
+      </div>
       <!-- Dark Mode Toggle -->
       <div class="flex items-center justify-between mb-4 pb-3 border-b">
         <label class="text-sm font-medium text-gray-700 flex items-center gap-2">
@@ -125,16 +137,23 @@
         </div>
       </div>
       <!-- Display Mode -->
-      <div>
+      <div class="mb-4 pb-3 border-b">
         <div class="text-sm font-medium text-gray-700 mb-2">Display Mode</div>
         <div class="flex gap-4">
-          <label class="flex items-center gap-1.5 text-sm cursor-pointer">
+          <label id="landscapeLabel" class="flex items-center gap-1.5 text-sm cursor-pointer">
             <input type="radio" name="displayMode" value="landscape" checked class="accent-blue-600" /> Landscape
           </label>
           <label class="flex items-center gap-1.5 text-sm cursor-pointer">
             <input type="radio" name="displayMode" value="portrait" class="accent-blue-600" /> Portrait
           </label>
         </div>
+      </div>
+      <!-- CSV File -->
+      <div>
+        <div class="text-sm font-medium text-gray-700 mb-2">CSV Menu File</div>
+        <div class="text-xs text-gray-500 mb-1" id="csvAutoStatus"></div>
+        <input id="csvFile" type="file" accept=".csv" class="text-sm w-full" />
+        <button id="loadSample" class="mt-1 px-3 py-1 rounded border text-sm bg-white hover:bg-gray-50 w-full">Load sample</button>
       </div>
     </div>
   </div>
@@ -219,7 +238,7 @@
     </div>
   </div>
 
-  <!-- Shared Controls (Voice + CSV) - always visible -->
+  <!-- Shared Controls (Voice) - always visible -->
   <div id="sharedControls" class="mb-3 bg-white p-4 rounded shadow">
     <div class="flex items-center gap-6 flex-wrap">
       <!-- Voice Dictation Toggle -->
@@ -229,12 +248,6 @@
         Start Dictation
       </button>
       <span id="voiceStatus" class="text-sm text-gray-500"></span>
-
-      <!-- CSV Loading (right side) -->
-      <div class="flex items-center gap-2 ml-auto">
-        <input id="csvFile" type="file" accept=".csv" class="text-sm" />
-        <button id="loadSample" class="px-3 py-1 rounded border text-sm bg-white hover:bg-gray-50">Load sample</button>
-      </div>
     </div>
     <div id="csvNote" class="text-sm text-yellow-700 mt-2"></div>
     <!-- Voice Transcript Bar -->
@@ -455,7 +468,7 @@ function buildFromCSV(rows){
       };
     }
 
-    ["Esophagus","GE Junction","Stomach","Duodenum"].forEach(loc => {
+    getLocationsForProcedure().forEach(loc => {
       if(isX(r[loc])) DISEASES[d].locations[loc] = true;
     });
 
@@ -506,6 +519,14 @@ function buildFromCSV(rows){
       }
     }
   });
+
+  // Prune diseases with no applicable locations for current procedure type
+  Object.keys(DISEASES).forEach(d => {
+    if (Object.keys(DISEASES[d].locations).length === 0) {
+      delete DISEASES[d];
+    }
+  });
+
   log('DISEASES model built with', Object.keys(DISEASES).length, 'diseases');
 }
 
@@ -648,12 +669,44 @@ function renderGroupLabel(group){
 }
 
 /* ---------- constants ---------- */
+
+// Location columns for each procedure type
+const ENDO_LOCATIONS = ['Esophagus', 'GE Junction', 'Stomach', 'Duodenum'];
+const COLONO_LOCATIONS = [
+  'Terminal Ileum', 'IC Valve', 'Caecum', 'Ascending Colon',
+  'Transverse Colon', 'Descending Colon', 'Sigmoid', 'Rectum', 'Anal Canal'
+];
+
+function getLocationsForProcedure(type) {
+  return (type || procedureType) === 'colonoscopy' ? COLONO_LOCATIONS : ENDO_LOCATIONS;
+}
+
+// Endoscopy sub-locations
 const SUBLOCATIONS = {
   'Esophagus':['Cricopharynx','Upper','Middle','Lower','Whole esophagus','Anastomosis'],
   'GE Junction':['Z-line','Hiatal hernia','Diaphragmatic pinch'],
   'Stomach': null, // Stomach uses matrix layout - see STOMACH_SUBLOC_MATRIX
   'Duodenum': null // Duodenum uses matrix layout - see DUODENUM_SUBLOC_MATRIX
 };
+
+// Colonoscopy sub-locations (only Rectum has sub-locations)
+const COLONO_SUBLOCATIONS = {
+  'Terminal Ileum': [],
+  'IC Valve': [],
+  'Caecum': [],
+  'Ascending Colon': [],
+  'Transverse Colon': [],
+  'Descending Colon': [],
+  'Sigmoid': [],
+  'Rectum': ['Anterior wall', 'Posterior wall', 'Right Lateral wall', 'Left Lateral wall'],
+  'Anal Canal': []
+};
+
+function getSublocationsForLocation(loc) {
+  if (SUBLOCATIONS[loc] !== undefined) return SUBLOCATIONS[loc];
+  if (COLONO_SUBLOCATIONS[loc] !== undefined) return COLONO_SUBLOCATIONS[loc];
+  return [];
+}
 
 // Stomach sub-location matrix structure
 const STOMACH_SUBLOC_MATRIX = [
@@ -698,6 +751,7 @@ let previousUhidSelection = '';
 
 /* ---------- settings state ---------- */
 let darkMode = false;
+let procedureType = 'endoscopy';     // 'endoscopy' | 'colonoscopy'
 let studyType = 'retrospective';    // 'retrospective' | 'prospective'
 let displayMode = 'landscape';       // 'landscape' | 'portrait'
 let prospectivePatient = { uhid: '', patientName: '', gender: '', age: '', indication: '' };
@@ -964,7 +1018,7 @@ function renderSubLocChips(){
   }
 
   // Standard pill layout for other locations
-  const options = SUBLOCATIONS[selectedMainLoc] || [];
+  const options = getSublocationsForLocation(selectedMainLoc) || [];
 
   options.forEach(s => {
     const chip = document.createElement("button");
@@ -2305,6 +2359,23 @@ function loadJsonFromText(text, filename, restoreUhidVideo) {
       report = tempReport;
     }
 
+    // Auto-detect procedure type from report locations or metadata
+    const metaProcedure = (parsedAll.__retroMeta && parsedAll.__retroMeta.procedureType)
+      || (parsedAll.__prospMeta && parsedAll.__prospMeta.procedureType);
+    if (metaProcedure && metaProcedure !== procedureType && typeof applyProcedureType === 'function') {
+      applyProcedureType(metaProcedure);
+    } else if (!metaProcedure) {
+      // Heuristic: detect from location keys
+      const reportLocs = Object.keys(parsedAll.report || report);
+      const isColono = reportLocs.some(l => COLONO_LOCATIONS.includes(l));
+      const isEndo = reportLocs.some(l => ENDO_LOCATIONS.includes(l));
+      if (isColono && !isEndo && procedureType !== 'colonoscopy' && typeof applyProcedureType === 'function') {
+        applyProcedureType('colonoscopy');
+      } else if (isEndo && !isColono && procedureType !== 'endoscopy' && typeof applyProcedureType === 'function') {
+        applyProcedureType('endoscopy');
+      }
+    }
+
     // Normalize sublocations
     Object.keys(report).forEach(loc => {
       const ds = report[loc].diseases || {};
@@ -2416,7 +2487,8 @@ function generatePDF(data, filename) {
   doc.setFontSize(18);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(30, 64, 175); // Blue color
-  doc.text('AIG Endoscopy Report', pageWidth / 2, yPos, { align: 'center' });
+  const pdfTitle = procedureType === 'colonoscopy' ? 'AIG Colonoscopy Report' : 'AIG Endoscopy Report';
+  doc.text(pdfTitle, pageWidth / 2, yPos, { align: 'center' });
   yPos += 12;
   doc.setTextColor(0, 0, 0); // Reset to black
 
@@ -2652,6 +2724,7 @@ document.getElementById("saveJSON").onclick = async () => {
         gender: prospectivePatient.gender || null,
         age: prospectivePatient.age || null,
         indication: prospectivePatient.indication || null,
+        procedureType: procedureType,
         csvFile: loadedCsvFilename || null,
         savedAt: new Date().toISOString()
       },
@@ -2702,6 +2775,7 @@ document.getElementById("saveJSON").onclick = async () => {
         endFrame: endFrame ? parseInt(endFrame, 10) : null,
         segmentationFrame: segmentationFrame ? parseInt(segmentationFrame, 10) : null,
         pii: piiEnabled,
+        procedureType: procedureType,
         csvFile: loadedCsvFilename || null,
         savedAt: new Date().toISOString()
       },
@@ -2793,6 +2867,58 @@ document.getElementById("saveJSON").onclick = async () => {
   document.getElementById('csvNote').textContent = `Downloaded: ${jsonFilename} and ${pdfFilename}`;
   log('Files download initiated');
 };
+
+/* ---------- CSV auto-load ---------- */
+
+async function autoLoadCsv() {
+  const isHttp = window.location.protocol === 'http:' || window.location.protocol === 'https:';
+
+  const urls = isHttp
+    ? ['/api/csv']
+    : ['./EHR_Menu - 20260224.csv', '../EHR_Menu - 20260224.csv'];
+
+  for (const url of urls) {
+    try {
+      const resp = await fetch(url);
+      if (!resp.ok) continue;
+
+      const text = await resp.text();
+      if (!text || text.length < 20) continue;
+
+      loadedCsvText = text;
+
+      // Try to extract filename from Content-Disposition header or URL
+      const cd = resp.headers.get('content-disposition');
+      const filenameMatch = cd && cd.match(/filename="?([^";\n]+)"?/);
+      loadedCsvFilename = filenameMatch ? filenameMatch[1] : url.split('/').pop();
+
+      const rows = parseCSV(text);
+      if (rows.length === 0) {
+        log('Auto-loaded CSV had no valid rows');
+        continue;
+      }
+
+      buildFromCSV(rows);
+      populateColumns();
+      renderSubLocChips();
+      renderReport();
+
+      const noteEl = document.getElementById('csvNote');
+      if (noteEl) noteEl.textContent = 'CSV auto-loaded (' + rows.length + ' rows) - ' + loadedCsvFilename;
+
+      const statusEl = document.getElementById('csvAutoStatus');
+      if (statusEl) statusEl.textContent = 'Auto-loaded: ' + loadedCsvFilename;
+
+      log('CSV auto-loaded:', loadedCsvFilename, rows.length, 'rows');
+      return true;
+    } catch (err) {
+      log('CSV auto-load attempt failed for', url, ':', err.message);
+    }
+  }
+
+  log('CSV auto-load: no source succeeded, manual upload available in settings');
+  return false;
+}
 
 /* ---------- CSV upload, sample, and JSON file load ---------- */
 
@@ -3064,6 +3190,7 @@ function _voiceConnect() {
       csv_text: loadedCsvText || "",
       report: report,
       overallRemarks: document.getElementById("overallRemarks").value || "",
+      procedure_type: procedureType || "endoscopy",
     };
     voiceWs.send(JSON.stringify(initMsg));
   };
@@ -3441,7 +3568,7 @@ function _sentencesCreateModal() {
   const header = document.createElement('div');
   header.className = 'flex justify-between items-center px-6 py-4 border-b shrink-0';
   header.innerHTML =
-    '<h2 class="text-xl font-bold text-gray-800">Endoscopy Sentences Report</h2>' +
+    '<h2 class="text-xl font-bold text-gray-800">' + (procedureType === 'colonoscopy' ? 'Colonoscopy' : 'Endoscopy') + ' Sentences Report</h2>' +
     '<button id="sentencesCloseBtn" class="text-gray-500 hover:text-gray-800 text-2xl leading-none">&times;</button>';
   modal.appendChild(header);
 
@@ -3556,7 +3683,7 @@ async function _sentencesGeneratePdf() {
     // Title
     var title = document.createElement('h1');
     title.style.cssText = 'text-align: center; color: #1e40af; font-size: 18pt; margin-bottom: 16px;';
-    title.textContent = 'AIG Endoscopy Report';
+    title.textContent = procedureType === 'colonoscopy' ? 'AIG Colonoscopy Report' : 'AIG Endoscopy Report';
     printDiv.appendChild(title);
 
     // Quill content
@@ -3648,7 +3775,92 @@ async function _sentencesGenerate() {
   }
 })();
 
-/* ---------- Settings: dark mode, study type, display mode ---------- */
+/* ---------- Settings: procedure type, dark mode, study type, display mode ---------- */
+
+/* ── Procedure type ── */
+
+function applyProcedureType(type) {
+  if (procedureType === type) return;
+
+  procedureType = type;
+
+  // Update radio buttons
+  document.querySelectorAll('input[name="procedureType"]').forEach(r => {
+    r.checked = (r.value === type);
+  });
+
+  // Update page title
+  const titleEl = document.getElementById('pageTitle');
+  if (titleEl) {
+    titleEl.textContent = type === 'colonoscopy' ? 'AIG Colonoscopy Report' : 'AIG Endoscopy Report';
+  }
+
+  // Colonoscopy forces portrait mode; disable landscape radio
+  _updateLandscapeAvailability();
+
+  if (type === 'colonoscopy' && displayMode !== 'portrait') {
+    applyDisplayMode('portrait');
+  }
+
+  // Clear report on procedure type switch
+  report = {};
+  active = null;
+  selectedMainLoc = getLocationsForProcedure()[0];
+  document.getElementById('detailsCard').classList.add('hidden');
+  document.getElementById('overallRemarks').value = '';
+  lastSavedReportState = JSON.stringify(report);
+
+  // Stop voice if active
+  if (typeof voiceActive !== 'undefined' && voiceActive && typeof _voiceStop === 'function') {
+    _voiceStop();
+  }
+
+  // Rebuild DISEASES from CSV with new location columns
+  if (loadedCsvText) {
+    const rows = parseCSV(loadedCsvText);
+    buildFromCSV(rows);
+  }
+
+  // If in portrait mode, rebuild location pills for new procedure type
+  if (displayMode === 'portrait') {
+    _rebuildPortraitLocationPills();
+  }
+
+  // Re-render everything
+  populateColumns();
+  renderSubLocChips();
+  renderReport();
+
+  // Persist
+  localStorage.setItem('ehr_procedureType', type);
+}
+
+function _updateLandscapeAvailability() {
+  const landscapeRadio = document.querySelector('input[name="displayMode"][value="landscape"]');
+  const landscapeLabel = document.getElementById('landscapeLabel');
+  const isColono = procedureType === 'colonoscopy';
+
+  if (landscapeRadio) landscapeRadio.disabled = isColono;
+  if (landscapeLabel) {
+    landscapeLabel.style.opacity = isColono ? '0.4' : '';
+    landscapeLabel.style.cursor = isColono ? 'not-allowed' : '';
+  }
+}
+
+function _rebuildPortraitLocationPills() {
+  const locPills = document.getElementById('locationPills');
+  if (!locPills) return;
+
+  locPills.innerHTML = '';
+  getLocationsForProcedure().forEach(loc => {
+    const pill = document.createElement('button');
+    pill.className = 'pill';
+    pill.textContent = loc;
+    pill.dataset.loc = loc;
+    pill.onclick = () => onPortraitLocationPillClick(loc);
+    locPills.appendChild(pill);
+  });
+}
 
 /* ── Dark mode ── */
 
@@ -3738,14 +3950,14 @@ function _switchToPortrait() {
     mainLayout.insertBefore(centerPane, rightPane);
   }
 
-  // Create location pills
+  // Create location pills (dynamic based on procedure type)
   let locPills = document.getElementById('locationPills');
   if (!locPills) {
     locPills = document.createElement('div');
     locPills.id = 'locationPills';
     locPills.className = 'bg-white p-4 rounded shadow flex gap-3 flex-wrap';
 
-    ['Esophagus', 'GE Junction', 'Stomach', 'Duodenum'].forEach(loc => {
+    getLocationsForProcedure().forEach(loc => {
       const pill = document.createElement('button');
       pill.className = 'pill';
       pill.textContent = loc;
@@ -3929,6 +4141,13 @@ function _wireProspectiveInputs() {
     });
   }
 
+  // Procedure type radios
+  document.querySelectorAll('input[name="procedureType"]').forEach(radio => {
+    radio.addEventListener('change', () => {
+      if (radio.checked) applyProcedureType(radio.value);
+    });
+  });
+
   // Dark mode toggle
   const darkToggle = document.getElementById('darkModeToggle');
   if (darkToggle) {
@@ -3962,7 +4181,30 @@ function _wireProspectiveInputs() {
     applyStudyType(savedStudy);
   }
 
-  // Display mode is NOT persisted — always starts in landscape
+  // Restore procedure type (lightweight: set state + UI, don't clear report or rebuild)
+  const savedProcedure = localStorage.getItem('ehr_procedureType');
+  if (savedProcedure && savedProcedure !== 'endoscopy') {
+    procedureType = savedProcedure;
+    document.querySelectorAll('input[name="procedureType"]').forEach(r => {
+      r.checked = (r.value === savedProcedure);
+    });
+    const titleEl = document.getElementById('pageTitle');
+    if (titleEl) {
+      titleEl.textContent = savedProcedure === 'colonoscopy' ? 'AIG Colonoscopy Report' : 'AIG Endoscopy Report';
+    }
+    selectedMainLoc = getLocationsForProcedure()[0];
+    _updateLandscapeAvailability();
+    if (savedProcedure === 'colonoscopy') {
+      applyDisplayMode('portrait');
+    }
+  }
+
+  // Display mode is NOT persisted — always starts in landscape (unless colonoscopy forces portrait)
+
+  // Auto-load CSV (runs after all settings are restored so procedureType is correct)
+  if (typeof autoLoadCsv === 'function') {
+    autoLoadCsv();
+  }
 })();
 
 </script>

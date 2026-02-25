@@ -61,10 +61,24 @@ app.mount("/js", StaticFiles(directory=SRC_DIR / "js"), name="js")
 app.mount("/pictures", StaticFiles(directory=PROJECT_DIR / "pictures"), name="pictures")
 
 
-# ── Sentences Report API ──
+# ── CSV API ──
 
 from fastapi import Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
+
+
+@app.get("/api/csv")
+async def serve_csv():
+    """Serve the latest CSV file matching the EHR_Menu pattern."""
+    csv_files = sorted(PROJECT_DIR.glob("EHR_Menu*.csv"))
+    if not csv_files:
+        return Response(status_code=404, content="No CSV file found")
+    # Return the most recent one (sorted alphabetically, date in name)
+    return FileResponse(csv_files[-1], media_type="text/csv",
+                        filename=csv_files[-1].name)
+
+
+# ── Sentences Report API ──
 
 
 @app.post("/api/generate-report")
@@ -113,6 +127,7 @@ class SessionState:
     overall_remarks: str = ""
     ehr_schema: Optional[dict] = None
     phrase_hints: list = field(default_factory=list)
+    procedure_type: str = "endoscopy"
 
     paused: bool = False           # Voice pause command active
     llm_busy: bool = False
@@ -340,6 +355,7 @@ async def call_llm_wrapper(session: SessionState, transcript: str) -> dict | Non
             session.current_report,
             session.overall_remarks,
             transcript,
+            procedure_type=session.procedure_type,
         )
         if result is None:
             log.warning("LLM returned None for transcript: %s", transcript[:80])
@@ -388,8 +404,9 @@ async def voice_ws(ws: WebSocket):
 
         # Parse CSV and build schema
         csv_text = init_data.get("csv_text", "")
+        procedure_type = init_data.get("procedure_type", "endoscopy")
         if csv_text:
-            session.ehr_schema = build_schema(csv_text)
+            session.ehr_schema = build_schema(csv_text, procedure_type=procedure_type)
             session.phrase_hints = _load_phrase_hints()
             log.info(
                 "Schema built: %d diseases, %d phrase hints",
@@ -399,6 +416,7 @@ async def voice_ws(ws: WebSocket):
         else:
             log.warning("No CSV text in init message")
 
+        session.procedure_type = procedure_type
         session.current_report = init_data.get("report", {})
         session.overall_remarks = init_data.get("overallRemarks", "")
 

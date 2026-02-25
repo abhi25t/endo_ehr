@@ -34,8 +34,8 @@ def _get_model() -> GenerativeModel:
 
 # ── System Prompt ──
 
-SYSTEM_PROMPT = """\
-You are assisting with filling a structured endoscopy EHR (Electronic Health Record) during a live procedure.
+_SYSTEM_PROMPT_TEMPLATE = """\
+You are assisting with filling a structured {procedure} EHR (Electronic Health Record) during a live procedure.
 
 You will receive:
 1. A SCHEMA defining all valid diseases, locations, sections, subsections, and attribute values
@@ -49,8 +49,7 @@ RULES:
 - Each disease must go under a valid location (check disease's "locations" array in schema)
 - For single-select sections (multi: false): set only ONE attribute to true, set others to false/remove
 - For multi-select sections (multi: true): multiple attributes can be true simultaneously
-- Sublocations for Stomach/Duodenum use "Region - Option" format (e.g., "Antrum - Lesser Curvature")
-- Sublocations for Esophagus/GE Junction are plain strings (e.g., "Lower", "Z-line")
+- Sublocations use the format defined in the schema. For matrix-based locations they use "Region - Option" format (e.g., "Antrum - Lesser Curvature"). For simple locations they are plain strings.
 - PRESERVE all existing data the doctor did not mention or change
 - Handle corrections: "Correction:", "No I meant...", "Change that to...", "Actually it's..."
   → Override the relevant field, don't add new entries
@@ -61,7 +60,7 @@ RULES:
   spoken numbers. E.g., doctor says "size is 15 mm" → values: ["15"]
 
 GARBAGE FILTERING — CRITICAL:
-- Only update the report based on statements clearly about the CURRENT endoscopy procedure
+- Only update the report based on statements clearly about the CURRENT {procedure} procedure
 - Text in non-Latin script (Devanagari, Telugu, etc.) = side conversation → IGNORE entirely
 - Code-switched sentences (Hindi/Telugu with English medical terms): only extract if the
   medical terms clearly describe a CURRENT finding
@@ -73,34 +72,37 @@ GARBAGE FILTERING — CRITICAL:
 - It is better to miss a finding (doctor can repeat) than to add incorrect data
 
 OUTPUT FORMAT — return ONLY this JSON structure:
-{
-  "report": {
-    "<LocationName>": {
-      "diseases": {
-        "<DiseaseName>": {
+{{
+  "report": {{
+    "<LocationName>": {{
+      "diseases": {{
+        "<DiseaseName>": {{
           "sublocations": ["..."],
-          "sections": {
-            "<SectionName>": {
-              "attrs": { "<AttributeName>": true },
+          "sections": {{
+            "<SectionName>": {{
+              "attrs": {{ "<AttributeName>": true }},
               "inputs": [],
-              "subsections": {
-                "<SubsectionName>": {
-                  "attrs": { "<AttributeName>": true },
+              "subsections": {{
+                "<SubsectionName>": {{
+                  "attrs": {{ "<AttributeName>": true }},
                   "inputs": []
-                }
-              }
-            }
-          },
+                }}
+              }}
+            }}
+          }},
           "comments": ""
-        }
-      }
-    }
-  },
+        }}
+      }}
+    }}
+  }},
   "overallRemarks": "..."
-}
+}}
 
 Return ONLY valid JSON. No markdown, no explanation, no code fences.
 """
+
+def _get_system_prompt(procedure_type: str = "endoscopy") -> str:
+    return _SYSTEM_PROMPT_TEMPLATE.format(procedure=procedure_type)
 
 
 def _build_prompt(schema: dict, current_report: dict, overall_remarks: str, transcript: str) -> str:
@@ -131,6 +133,7 @@ async def call_llm(
     current_report: dict,
     overall_remarks: str,
     transcript: str,
+    procedure_type: str = "endoscopy",
 ) -> dict | None:
     """
     Call Gemini to update EHR report from transcript.
@@ -140,6 +143,7 @@ async def call_llm(
     """
     model = _get_model()
 
+    system_prompt = _get_system_prompt(procedure_type)
     user_prompt = _build_prompt(schema, current_report, overall_remarks, transcript)
 
     generation_config = GenerationConfig(
@@ -152,7 +156,7 @@ async def call_llm(
 
     try:
         response = await model.generate_content_async(
-            [SYSTEM_PROMPT, user_prompt],
+            [system_prompt, user_prompt],
             generation_config=generation_config,
         )
 
@@ -168,8 +172,9 @@ async def call_llm(
 
         # Ensure expected keys exist
         if "report" not in result:
-            # Maybe LLM returned report at top level
-            if any(k in result for k in ("Esophagus", "GE Junction", "Stomach", "Duodenum")):
+            # Maybe LLM returned report at top level — check for known location names
+            valid_locs = set(schema.get("locations", []))
+            if any(k in result for k in valid_locs):
                 result = {"report": result, "overallRemarks": overall_remarks or ""}
             else:
                 log.warning("LLM response missing 'report' key")
@@ -192,12 +197,12 @@ async def call_llm(
 # ── Sentences Report ──
 
 SENTENCES_REPORT_PROMPT = """\
-You are an expert endoscopy report writer. You will receive structured JSON data \
-from a hospital's endoscopy EHR system.
+You are an expert endoscopy/colonoscopy report writer. You will receive structured JSON data \
+from a hospital's EHR system.
 
 Convert it into crisp, typical sentences using the standard jargon of an \
-endoscopy report. Use words which doctors typically use such as "suspected", \
-"noted", "seen", "revealed", "appeared", "suggestive of", etc.
+endoscopy or colonoscopy report as appropriate. Use words which doctors typically use such as \
+"suspected", "noted", "seen", "revealed", "appeared", "suggestive of", etc.
 
 RULES:
 - Do NOT use bullet points. Use sentences only.
@@ -208,7 +213,7 @@ RULES:
 - If overall remarks exist, include them at the end.
 
 FORMAT your output as HTML:
-- <h2> for anatomical locations (Esophagus, GE Junction, Stomach, Duodenum)
+- <h2> for anatomical locations
 - <h3> for disease/finding names
 - <p> for descriptive sentences
 - Use <strong> for emphasis on key findings

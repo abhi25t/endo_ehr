@@ -1,8 +1,8 @@
-# Endoscopy EHR Prototype
+# Endoscopy & Colonoscopy EHR Prototype
 
 ## Project Overview
 
-A modular HTML prototype for an Endoscopy Electronic Health Record (EHR) system with hierarchical menus and **real-time voice dictation**. Built for use on large desktop monitors with ample screen real estate. Uses Tailwind CSS for styling, vanilla JavaScript for the frontend, and a Python (FastAPI) backend for voice-to-EHR automation.
+A modular HTML prototype for an Endoscopy and Colonoscopy Electronic Health Record (EHR) system with hierarchical menus and **real-time voice dictation**. Supports both upper GI endoscopy (4 locations: Esophagus, GE Junction, Stomach, Duodenum) and colonoscopy (9 locations: Terminal Ileum through Anal Canal), switchable via a procedure type toggle in settings. Built for use on large desktop monitors with ample screen real estate. Uses Tailwind CSS for styling, vanilla JavaScript for the frontend, and a Python (FastAPI) backend for voice-to-EHR automation.
 
 The app has two modes:
 - **Standalone mode**: Open `Endo_EHR.html` directly in browser (file://). Voice features disabled, EHR works as a manual click-based form.
@@ -33,7 +33,7 @@ The app has two modes:
 project/
 ├── build.py                    # Build script: src/ → Endo_EHR.html
 ├── Endo_EHR.html               # Built distributable (double-click to open)
-├── EGD_Heirarchial_Menu_*.csv  # Disease/section definitions
+├── EHR_Menu - YYYYMMDD.csv     # Disease/section definitions
 ├── pipelines_figma.png         # Architecture diagram (voice pipeline design)
 │
 ├── server.py                   # FastAPI backend: serves frontend + WebSocket voice endpoint
@@ -60,8 +60,8 @@ project/
         ├── 02-csv-parser.js    # parseCSV(), expandRangeToken(), isX(), isMultiFlag(), buildFromCSV()
         ├── 03-hint-helpers.js  # createHintElement()
         ├── 04-input-helpers.js # parseAttributePattern(), groupHasAnyValue(), renderGroupLabel()
-        ├── 05-constants.js     # SUBLOCATIONS, STOMACH/DUODENUM matrices, VIDEO_EXTENSIONS, FPS
-        ├── 06-state.js         # All mutable globals (DISEASES, report, active, retroData, loadedCsvText, settings state, etc.)
+        ├── 05-constants.js     # ENDO_LOCATIONS, COLONO_LOCATIONS, COLONO_SUBLOCATIONS, SUBLOCATIONS, STOMACH/DUODENUM matrices, getLocationsForProcedure(), getSublocationsForLocation(), VIDEO_EXTENSIONS, FPS
+        ├── 06-state.js         # All mutable globals (DISEASES, report, active, retroData, loadedCsvText, procedureType, settings state, etc.)
         ├── 07-conditional-logic.js  # evaluateSingleCondition(), evaluateConditional()
         ├── 08-disease-columns.js    # populateColumns(), refreshLeftHighlights(), portrait variants
         ├── 09-sublocation-ui.js     # renderSubLocChips(), renderSublocMatrix(), toggle functions
@@ -72,11 +72,11 @@ project/
         ├── 14-json-io.js            # loadJsonFromText() (unified JSON loader)
         ├── 15-pdf-generation.js     # generateTimestamp(), generatePDF()
         ├── 16-save-report.js        # Save and Clear button handlers
-        ├── 17-csv-upload.js         # CSV file handler (stores loadedCsvText), sample loader, JSON file load
+        ├── 17-csv-upload.js         # CSV file handler (stores loadedCsvText), sample loader, JSON file load, autoLoadCsv()
         ├── 18-init.js               # Init IIFE
         ├── 19-voice.js             # Voice dictation: audio capture, WebSocket, applyVoiceUpdate(), UI
         ├── 20-sentences-report.js  # Sentences report: Gemini → Quill rich text editor → PDF via html2pdf.js
-        └── 21-settings.js         # Settings panel: dark mode, study type (retro/prosp), display mode (landscape/portrait)
+        └── 21-settings.js         # Settings panel: procedure type (endo/colono), dark mode, study type (retro/prosp), display mode (landscape/portrait)
 ```
 
 ## Development Workflow
@@ -92,7 +92,7 @@ project/
 2. Set up Google Cloud credentials: `export GOOGLE_APPLICATION_CREDENTIALS=<your-key.json>`
 3. Start backend: `python server.py` (default port 8000, `--port N` for custom)
 4. Open `http://localhost:8000` in Chrome
-5. Load CSV → Click "Start Dictation" → speak into microphone
+5. CSV auto-loads on start → Click "Start Dictation" → speak into microphone
 6. Voice features require HTTP (not file://) due to `getUserMedia` secure context requirement
 
 ## Voice Dictation Architecture
@@ -168,7 +168,7 @@ applyVoiceUpdate(report)
 
 | Frame | Format | Purpose |
 |-------|--------|---------|
-| Text | `{"type":"init", "csv_text":"...", "report":{...}}` | Initialize session with CSV and current report |
+| Text | `{"type":"init", "csv_text":"...", "report":{...}, "procedure_type":"endoscopy"}` | Initialize session with CSV, current report, and procedure type |
 | Binary | Raw PCM Int16 bytes (16kHz mono) | Audio data from microphone |
 | Text | `{"type":"report_state", "report":{...}}` | Sync after manual UI edit |
 | Text | `{"type":"stop"}` | End dictation session |
@@ -226,9 +226,10 @@ When the user makes manual edits while voice is active:
 
 ### Left Pane Components
 
-1. **Top Section - Location Grid (1x4)**
-   - Esophagus | GE Junction | Stomach | Duodenum
-   - Each column shows applicable diseases from CSV
+1. **Top Section - Location Grid**
+   - **Endoscopy (landscape)**: 4-column grid — Esophagus | GE Junction | Stomach | Duodenum
+   - **Colonoscopy (portrait only)**: 9 location pills — Terminal Ileum | IC Valve | Caecum | Ascending Colon | Transverse Colon | Descending Colon | Sigmoid | Rectum | Anal Canal
+   - Each column/pill shows applicable diseases from CSV
 
 2. **Sub-Location Section**
    - Dynamic based on selected location
@@ -237,6 +238,8 @@ When the user makes manual edits while voice is active:
    - **GE Junction**: Simple pill list (Z-line, Hiatal hernia, Diaphragmatic pinch)
    - **Stomach**: Matrix layout (see below)
    - **Duodenum**: Matrix layout (see below)
+   - **Rectum** (colonoscopy): Simple pill list (Anterior wall, Posterior wall, Right Lateral wall, Left Lateral wall)
+   - **Other colonoscopy locations** (Terminal Ileum, IC Valve, Caecum, Ascending Colon, Transverse Colon, Descending Colon, Sigmoid, Anal Canal): No sub-locations
 
 3. **Details Section**
    - Appears when a disease is selected
@@ -265,6 +268,20 @@ When the user makes manual edits while voice is active:
 
 **Matrix Behavior**: Selecting an option in column 2 auto-selects the region pill in column 1. Deselecting all options for a region auto-deselects the region.
 
+### Colonoscopy Locations (Portrait Mode Only)
+
+| Location | Sub-Locations |
+|----------|--------------|
+| Terminal Ileum | (none) |
+| IC Valve | (none) |
+| Caecum | (none) |
+| Ascending Colon | (none) |
+| Transverse Colon | (none) |
+| Descending Colon | (none) |
+| Sigmoid | (none) |
+| Rectum | Anterior wall, Posterior wall, Right Lateral wall, Left Lateral wall |
+| Anal Canal | (none) |
+
 ### Right Pane Components
 
 1. **Report Header**
@@ -286,7 +303,15 @@ When the user makes manual edits while voice is active:
 
 ## Settings Panel
 
-A gear button (&#9881;) at the top-right corner opens a settings dropdown with three options:
+A gear button (&#9881;) at the top-right corner opens a settings dropdown with four options:
+
+### Procedure Type: Endoscopy vs Colonoscopy
+- **Endoscopy** (default): 4 upper GI locations (Esophagus, GE Junction, Stomach, Duodenum)
+- **Colonoscopy**: 9 lower GI locations (Terminal Ileum, IC Valve, Caecum, Ascending Colon, Transverse Colon, Descending Colon, Sigmoid, Rectum, Anal Canal)
+- Colonoscopy forces portrait layout (landscape radio disabled)
+- Switching procedure type clears the current report
+- CSV is re-parsed with the new procedure-type location columns
+- Persisted in `localStorage` key `ehr_procedureType`
 
 ### Dark Mode
 - Toggle with crescent moon icon (&#9790;)
@@ -311,6 +336,7 @@ A gear button (&#9881;) at the top-right corner opens a settings dropdown with t
 - **Landscape** (default): Original 75/25 two-pane layout with 4-column disease grid
 - **Portrait**: Three-column layout (20% / 65% / 15%) for 1080x1920 portrait TV
 - Display mode is NOT persisted — always starts in landscape
+- **Note**: Landscape is disabled when colonoscopy is selected (colonoscopy requires portrait mode due to 9 locations)
 
 #### Portrait Layout Structure
 
@@ -340,7 +366,7 @@ The portrait mode uses a **disease-first** interaction model (opposite of landsc
 When switching to portrait:
 1. `#diseaseGridCard` is hidden (4-column grid)
 2. `#centerPane` is created between leftPane and rightPane
-3. `#locationPills` (4 organ location buttons) created inside centerPane
+3. `#locationPills` (location buttons: 4 for endoscopy, 9 for colonoscopy) dynamically generated from `getLocationsForProcedure()` inside centerPane
 4. `#sublocSection` moved from diseaseGridCard → centerPane
 5. `#detailsCard` moved from leftPane → centerPane
 6. `#mainLayout` switches from `display: flex` to `display: grid; grid-template-columns: 20% 1fr 15%`
@@ -372,7 +398,8 @@ The control area below the heading is split into three sections:
    - Status indicator next to button: "Listening...", "AI Processing...", "Paused", "Disconnected"
 2. **Transcript Bar** - Below controls, hidden until dictation starts
    - Partial transcripts in gray italic, final transcripts in black
-3. **CSV File Input** - Load disease definitions (right-aligned)
+
+**Note**: CSV auto-loads on page start via `autoLoadCsv()` (fetches from server `/api/csv` in HTTP mode, or uses built-in sample for file:// mode). Manual CSV upload is available in the settings panel.
 
 ## CSV Format
 
@@ -387,7 +414,8 @@ The CSV defines diseases, sections, subsections, and attributes.
 | Subsection | Subsection name (optional) |
 | Section_Hint | Hint text/images for section |
 | Subsection_Hint | Hint text for subsection |
-| Esophagus, GE Junction, Stomach, Duodenum | "x" marks applicability |
+| Esophagus, GE Junction, Stomach, Duodenum | "x" marks applicability (endoscopy locations) |
+| Terminal Ileum, IC Valve, Caecum, Ascending Colon, Transverse Colon, Descending Colon, Sigmoid, Rectum, Anal Canal | "x" marks applicability (colonoscopy locations) |
 | Default_Sub_Location | Auto-selected sub-location |
 | Conditional_on | Visibility condition |
 | Multi_Attribute | "x" for multi-select, empty for single |
@@ -476,6 +504,7 @@ Format: `Subsection(Name=Value)` or `Section(Name=Value)`
     endFrame: number,
     segmentationFrame: number,
     pii: boolean,
+    procedureType: string,
     csvFile: string,
     savedAt: ISO timestamp
   },
@@ -486,6 +515,7 @@ Format: `Subsection(Name=Value)` or `Section(Name=Value)`
     gender: string,
     age: string,
     indication: string,
+    procedureType: string,
     csvFile: string,
     savedAt: ISO timestamp
   },
@@ -522,6 +552,10 @@ Format: `Subsection(Name=Value)` or `Section(Name=Value)`
 ```
 
 ### EHR Schema (for LLM context, generated by schema_builder.py)
+
+The schema varies by procedure type. `build_schema(csv_text, procedure_type)` takes a `procedure_type` parameter (`"endoscopy"` or `"colonoscopy"`) to select the appropriate location columns from the CSV.
+
+**Endoscopy example:**
 ```json
 {
   "locations": ["Esophagus", "GE Junction", "Stomach", "Duodenum"],
@@ -540,6 +574,23 @@ Format: `Subsection(Name=Value)` or `Section(Name=Value)`
         "Number": { "multi": false, "attributes": ["Single", "Multiple (2-5)", ...] },
         "Forrest Classification": { "multi": false, "attributes": [...] }
       }
+    }
+  }
+}
+```
+
+**Colonoscopy example:**
+```json
+{
+  "locations": ["Terminal Ileum", "IC Valve", "Caecum", "Ascending Colon", "Transverse Colon", "Descending Colon", "Sigmoid", "Rectum", "Anal Canal"],
+  "sublocations": {
+    "Rectum": ["Anterior wall", "Posterior wall", "Right Lateral wall", "Left Lateral wall"]
+  },
+  "diseases": {
+    "Polyp": {
+      "locations": ["Caecum", "Ascending Colon", "Transverse Colon", ...],
+      "default_sublocation": "",
+      "sections": { ... }
     }
   }
 }
@@ -609,6 +660,10 @@ Validation pipeline: Parse JSON → Pydantic model_validate → strip invalid lo
 17. ✅ Portrait display mode with disease-first interaction model
 18. ✅ Dark mode via CSS overrides (avoids touching JS rendering functions)
 19. ✅ Multi-location disease support in portrait mode (e.g., Ulcer added separately to Stomach and Duodenum)
+20. ✅ Colonoscopy support with 9 location columns and Rectum sub-locations
+21. ✅ Procedure type toggle (endoscopy/colonoscopy) with localStorage persistence
+22. ✅ CSV auto-load on page start (server `/api/csv` + file:// fallback)
+23. ✅ CSV file input moved to settings panel
 
 ## Development Notes
 
@@ -643,8 +698,8 @@ Backend logging: Python `logging` module, logger name `"ehr-voice"`, level INFO.
 | `applyVoiceUpdate(data)` | `19-voice` | Apply LLM-produced report update to UI |
 | `_voiceStart()` / `_voiceStop()` | `19-voice` | Start/stop dictation (audio + WebSocket) |
 | `voiceScheduleSync()` | `19-voice` | Debounced sync of manual edits to backend |
-| `build_schema(csv_text)` | `schema_builder` | CSV → canonical EHR schema dict |
-| `call_llm(schema, report, remarks, transcript)` | `llm_caller` | Gemini call to update EHR from transcript |
+| `build_schema(csv_text, procedure_type)` | `schema_builder` | CSV → canonical EHR schema dict (filtered by procedure type) |
+| `call_llm(schema, report, remarks, transcript, procedure_type)` | `llm_caller` | Gemini call to update EHR from transcript |
 | `validate_llm_response(data, schema)` | `models` | Pydantic validation of LLM output |
 | `run_asr_bridge(ws, session)` | `asr_bridge` | Main ASR entry point (async task) |
 | `transcript_batcher(ws, session)` | `server` | Debounce + batch finals → LLM calls |
@@ -658,6 +713,10 @@ Backend logging: Python `logging` module, logger name `"ehr-voice"`, level INFO.
 | `refreshPortraitHighlights()` | `08-disease-columns` | Update disease button states in portrait mode |
 | `onPortraitLocationPillClick(loc)` | `21-settings` | Handle location pill click in portrait mode |
 | `updatePortraitLocationPills()` | `21-settings` | Update location pill greying/highlighting based on active disease |
+| `applyProcedureType(type)` | `21-settings` | Switch endoscopy/colonoscopy, rebuild diseases, force portrait for colono |
+| `autoLoadCsv()` | `17-csv-upload` | Auto-fetch CSV on page load (server API or file://) |
+| `getLocationsForProcedure()` | `05-constants` | Return location array for current procedure type |
+| `getSublocationsForLocation(loc)` | `05-constants` | Return sub-location array for a given location |
 
 ### Adding New Matrix Locations
 
@@ -694,7 +753,7 @@ python gemini_test.py
 
 ```bash
 # Generate EHR schema JSON from CSV (for inspection)
-python schema_builder.py EGD_Heirarchial_Menu-20260214.csv
+python schema_builder.py "EHR_Menu - 20260224.csv"
 ```
 
 ### ASR Phrase Hints
@@ -781,6 +840,23 @@ python schema_builder.py EGD_Heirarchial_Menu-20260214.csv
 - [ ] "Submit and Create PDF Report" → PDF downloads
 - [ ] PDF has title, formatted content, readable layout
 - [ ] Modal closes via X button, ESC key, or backdrop click
+
+### Colonoscopy Mode
+- [ ] Toggle to Colonoscopy in settings → report clears, portrait forces
+- [ ] 9 location pills appear (Terminal Ileum through Anal Canal)
+- [ ] Only colonoscopy-applicable diseases shown
+- [ ] Click Rectum → 4 sublocation pills appear
+- [ ] Other colonoscopy locations → no sublocation pills
+- [ ] Landscape radio disabled when colonoscopy selected
+- [ ] Toggle back to Endoscopy → landscape enabled, 4 columns restored
+- [ ] Procedure type persists across page reload
+- [ ] Save JSON → procedureType in metadata
+- [ ] Load colonoscopy JSON → auto-switches to colonoscopy mode
+
+### CSV Auto-Load
+- [ ] Server mode: CSV auto-loads on page start
+- [ ] CSV file input available in settings panel
+- [ ] Manual CSV upload still works from settings
 
 ### Sentences Report
 

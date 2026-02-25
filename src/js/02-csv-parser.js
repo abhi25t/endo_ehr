@@ -100,7 +100,7 @@ function buildFromCSV(rows){
       };
     }
 
-    ["Esophagus","GE Junction","Stomach","Duodenum"].forEach(loc => {
+    getLocationsForProcedure().forEach(loc => {
       if(isX(r[loc])) DISEASES[d].locations[loc] = true;
     });
 
@@ -151,5 +151,13 @@ function buildFromCSV(rows){
       }
     }
   });
+
+  // Prune diseases with no applicable locations for current procedure type
+  Object.keys(DISEASES).forEach(d => {
+    if (Object.keys(DISEASES[d].locations).length === 0) {
+      delete DISEASES[d];
+    }
+  });
+
   log('DISEASES model built with', Object.keys(DISEASES).length, 'diseases');
 }

@@ -20,6 +20,7 @@ let previousUhidSelection = '';
 
 /* ---------- settings state ---------- */
 let darkMode = false;
+let procedureType = 'endoscopy';     // 'endoscopy' | 'colonoscopy'
 let studyType = 'retrospective';    // 'retrospective' | 'prospective'
 let displayMode = 'landscape';       // 'landscape' | 'portrait'
 let prospectivePatient = { uhid: '', patientName: '', gender: '', age: '', indication: '' };

@@ -17,7 +17,7 @@ from collections import OrderedDict
 
 # ── Sublocation constants (must match src/js/05-constants.js) ──
 
-SUBLOCATIONS = {
+ENDO_SUBLOCATIONS = {
     "Esophagus": ["Cricopharynx", "Upper", "Middle", "Lower", "Whole esophagus", "Anastomosis"],
     "GE Junction": ["Z-line", "Hiatal hernia", "Diaphragmatic pinch"],
     "Stomach": {
@@ -35,7 +35,23 @@ SUBLOCATIONS = {
     },
 }
 
-LOCATION_COLS = ["Esophagus", "GE Junction", "Stomach", "Duodenum"]
+COLONO_SUBLOCATIONS = {
+    "Terminal Ileum": [],
+    "IC Valve": [],
+    "Caecum": [],
+    "Ascending Colon": [],
+    "Transverse Colon": [],
+    "Descending Colon": [],
+    "Sigmoid": [],
+    "Rectum": ["Anterior wall", "Posterior wall", "Right Lateral wall", "Left Lateral wall"],
+    "Anal Canal": [],
+}
+
+ENDO_LOCATION_COLS = ["Esophagus", "GE Junction", "Stomach", "Duodenum"]
+COLONO_LOCATION_COLS = [
+    "Terminal Ileum", "IC Valve", "Caecum", "Ascending Colon",
+    "Transverse Colon", "Descending Colon", "Sigmoid", "Rectum", "Anal Canal",
+]
 
 
 def _is_x(val: str) -> bool:
@@ -53,7 +69,7 @@ def _extract_attributes(row: dict) -> list[str]:
     return attrs
 
 
-def build_schema(csv_text: str) -> dict:
+def build_schema(csv_text: str, procedure_type: str = "endoscopy") -> dict:
     """
     Parse CSV text and produce a canonical EHR schema for the LLM.
 
@@ -82,6 +98,10 @@ def build_schema(csv_text: str) -> dict:
             }
         }
     """
+    is_colono = procedure_type == "colonoscopy"
+    location_cols = COLONO_LOCATION_COLS if is_colono else ENDO_LOCATION_COLS
+    sublocations = COLONO_SUBLOCATIONS if is_colono else ENDO_SUBLOCATIONS
+
     reader = csv.DictReader(io.StringIO(csv_text))
 
     diseases = OrderedDict()
@@ -102,7 +122,7 @@ def build_schema(csv_text: str) -> dict:
         d = diseases[diagnosis]
 
         # Accumulate locations (dedup)
-        for loc in LOCATION_COLS:
+        for loc in location_cols:
             if _is_x(row.get(loc, "")) and loc not in d["locations"]:
                 d["locations"].append(loc)
 
@@ -155,8 +175,12 @@ def build_schema(csv_text: str) -> dict:
             if conditional:
                 sub["conditional"] = conditional
 
-    # Clean up empty fields
-    for dname, ddef in diseases.items():
+    # Clean up empty fields and prune diseases with no applicable locations
+    for dname in list(diseases.keys()):
+        ddef = diseases[dname]
+        if not ddef["locations"]:
+            del diseases[dname]
+            continue
         for sname, sdef in list(ddef["sections"].items()):
             if not sdef["attributes"]:
                 del sdef["attributes"]
@@ -167,8 +191,8 @@ def build_schema(csv_text: str) -> dict:
                 del sdef["subsections"]
 
     return {
-        "locations": LOCATION_COLS,
-        "sublocations": SUBLOCATIONS,
+        "locations": location_cols,
+        "sublocations": sublocations,
         "diseases": diseases,
     }
 

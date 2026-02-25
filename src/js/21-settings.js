@@ -1,4 +1,89 @@
-/* ---------- Settings: dark mode, study type, display mode ---------- */
+/* ---------- Settings: procedure type, dark mode, study type, display mode ---------- */
+
+/* ── Procedure type ── */
+
+function applyProcedureType(type) {
+  if (procedureType === type) return;
+
+  procedureType = type;
+
+  // Update radio buttons
+  document.querySelectorAll('input[name="procedureType"]').forEach(r => {
+    r.checked = (r.value === type);
+  });
+
+  // Update page title
+  const titleEl = document.getElementById('pageTitle');
+  if (titleEl) {
+    titleEl.textContent = type === 'colonoscopy' ? 'AIG Colonoscopy Report' : 'AIG Endoscopy Report';
+  }
+
+  // Colonoscopy forces portrait mode; disable landscape radio
+  _updateLandscapeAvailability();
+
+  if (type === 'colonoscopy' && displayMode !== 'portrait') {
+    applyDisplayMode('portrait');
+  }
+
+  // Clear report on procedure type switch
+  report = {};
+  active = null;
+  selectedMainLoc = getLocationsForProcedure()[0];
+  document.getElementById('detailsCard').classList.add('hidden');
+  document.getElementById('overallRemarks').value = '';
+  lastSavedReportState = JSON.stringify(report);
+
+  // Stop voice if active
+  if (typeof voiceActive !== 'undefined' && voiceActive && typeof _voiceStop === 'function') {
+    _voiceStop();
+  }
+
+  // Rebuild DISEASES from CSV with new location columns
+  if (loadedCsvText) {
+    const rows = parseCSV(loadedCsvText);
+    buildFromCSV(rows);
+  }
+
+  // If in portrait mode, rebuild location pills for new procedure type
+  if (displayMode === 'portrait') {
+    _rebuildPortraitLocationPills();
+  }
+
+  // Re-render everything
+  populateColumns();
+  renderSubLocChips();
+  renderReport();
+
+  // Persist
+  localStorage.setItem('ehr_procedureType', type);
+}
+
+function _updateLandscapeAvailability() {
+  const landscapeRadio = document.querySelector('input[name="displayMode"][value="landscape"]');
+  const landscapeLabel = document.getElementById('landscapeLabel');
+  const isColono = procedureType === 'colonoscopy';
+
+  if (landscapeRadio) landscapeRadio.disabled = isColono;
+  if (landscapeLabel) {
+    landscapeLabel.style.opacity = isColono ? '0.4' : '';
+    landscapeLabel.style.cursor = isColono ? 'not-allowed' : '';
+  }
+}
+
+function _rebuildPortraitLocationPills() {
+  const locPills = document.getElementById('locationPills');
+  if (!locPills) return;
+
+  locPills.innerHTML = '';
+  getLocationsForProcedure().forEach(loc => {
+    const pill = document.createElement('button');
+    pill.className = 'pill';
+    pill.textContent = loc;
+    pill.dataset.loc = loc;
+    pill.onclick = () => onPortraitLocationPillClick(loc);
+    locPills.appendChild(pill);
+  });
+}
 
 /* ── Dark mode ── */
 
@@ -88,14 +173,14 @@ function _switchToPortrait() {
     mainLayout.insertBefore(centerPane, rightPane);
   }
 
-  // Create location pills
+  // Create location pills (dynamic based on procedure type)
   let locPills = document.getElementById('locationPills');
   if (!locPills) {
     locPills = document.createElement('div');
     locPills.id = 'locationPills';
     locPills.className = 'bg-white p-4 rounded shadow flex gap-3 flex-wrap';
 
-    ['Esophagus', 'GE Junction', 'Stomach', 'Duodenum'].forEach(loc => {
+    getLocationsForProcedure().forEach(loc => {
       const pill = document.createElement('button');
       pill.className = 'pill';
       pill.textContent = loc;
@@ -279,6 +364,13 @@ function _wireProspectiveInputs() {
     });
   }
 
+  // Procedure type radios
+  document.querySelectorAll('input[name="procedureType"]').forEach(radio => {
+    radio.addEventListener('change', () => {
+      if (radio.checked) applyProcedureType(radio.value);
+    });
+  });
+
   // Dark mode toggle
   const darkToggle = document.getElementById('darkModeToggle');
   if (darkToggle) {
@@ -312,5 +404,28 @@ function _wireProspectiveInputs() {
     applyStudyType(savedStudy);
   }
 
-  // Display mode is NOT persisted — always starts in landscape
+  // Restore procedure type (lightweight: set state + UI, don't clear report or rebuild)
+  const savedProcedure = localStorage.getItem('ehr_procedureType');
+  if (savedProcedure && savedProcedure !== 'endoscopy') {
+    procedureType = savedProcedure;
+    document.querySelectorAll('input[name="procedureType"]').forEach(r => {
+      r.checked = (r.value === savedProcedure);
+    });
+    const titleEl = document.getElementById('pageTitle');
+    if (titleEl) {
+      titleEl.textContent = savedProcedure === 'colonoscopy' ? 'AIG Colonoscopy Report' : 'AIG Endoscopy Report';
+    }
+    selectedMainLoc = getLocationsForProcedure()[0];
+    _updateLandscapeAvailability();
+    if (savedProcedure === 'colonoscopy') {
+      applyDisplayMode('portrait');
+    }
+  }
+
+  // Display mode is NOT persisted — always starts in landscape (unless colonoscopy forces portrait)
+
+  // Auto-load CSV (runs after all settings are restored so procedureType is correct)
+  if (typeof autoLoadCsv === 'function') {
+    autoLoadCsv();
+  }
 })();

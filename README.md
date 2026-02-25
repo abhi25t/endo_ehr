@@ -1,12 +1,12 @@
-# Endoscopy EHR
+# Endoscopy & Colonoscopy EHR
 
-A real-time, voice-powered Electronic Health Record system for endoscopy procedures. Doctors speak naturally during procedures while the app listens, understands, and fills in structured medical findings automatically.
+A real-time, voice-powered Electronic Health Record system for endoscopy and colonoscopy procedures. Doctors speak naturally during procedures while the app listens, understands, and fills in structured medical findings automatically.
 
 ---
 
 ## Why This Exists
 
-During an endoscopy, the doctor's hands are occupied holding the scope and instruments. Typing findings into an EHR is impossible in real time. The current workflow forces doctors to either:
+During an endoscopy or colonoscopy, the doctor's hands are occupied holding the scope and instruments. Typing findings into an EHR is impossible in real time. The current workflow forces doctors to either:
 
 - **Dictate to a human assistant** who manually fills forms (error-prone, needs trained staff)
 - **Write reports after the procedure** from memory (details lost, time wasted)
@@ -32,7 +32,8 @@ The result is a **complete, structured endoscopy report** generated during the p
 
 ### Structured Disease Reporting
 - Hierarchical menu system: **Location** > **Disease** > **Sub-location** > **Sections** > **Attributes**
-- 4 organ locations: Esophagus, GE Junction, Stomach, Duodenum
+- Endoscopy: 4 locations (Esophagus, GE Junction, Stomach, Duodenum)
+- Colonoscopy: 9 locations (Terminal Ileum, IC Valve, Caecum, Ascending Colon, Transverse Colon, Descending Colon, Sigmoid, Rectum, Anal Canal)
 - Sub-location matrices for Stomach (Antrum, Incisura, Body, Fundus with wall positions) and Duodenum (D1-D4 with wall positions)
 - Conditional visibility: sections appear/hide based on other selections
 - Default attributes auto-applied from CSV definitions
@@ -52,6 +53,12 @@ The result is a **complete, structured endoscopy report** generated during the p
 
 ### Dark Mode
 - Full dark theme for dimly-lit endoscopy suites
+
+### Procedure Type Toggle
+- Switch between **Endoscopy** and **Colonoscopy** in settings
+- Each procedure type uses different CSV location columns
+- Colonoscopy is portrait-only (optimized for the 9-location workflow)
+- CSV auto-loads on page start via server API (manual upload still available in settings)
 
 ---
 
@@ -103,7 +110,7 @@ The result is a **complete, structured endoscopy report** generated during the p
 open Endo_EHR.html
 ```
 
-Load a CSV disease definition file, then click diseases and fill attributes manually.
+The CSV auto-loads when served. Open the file, then click diseases and fill attributes manually.
 
 ### Option 2: Voice-Enabled Mode
 
@@ -121,9 +128,10 @@ python server.py
 # http://localhost:8000
 ```
 
-1. Load a CSV disease definition file
-2. Click **Start Dictation**
-3. Speak findings naturally — the report fills itself
+1. CSV auto-loads on start (or load manually from settings)
+2. Select Endoscopy or Colonoscopy in settings
+3. Click **Start Dictation**
+4. Speak findings naturally — the report fills itself
 
 ---
 
@@ -152,7 +160,8 @@ The EHR structure is entirely driven by a CSV file, making it customizable witho
 |--------|---------|
 | `Diagnosis` | Disease/finding name |
 | `Section` / `Subsection` | Hierarchical attribute grouping |
-| `Esophagus`, `GE Junction`, `Stomach`, `Duodenum` | Location applicability (`x` marks) |
+| `Esophagus`, `GE Junction`, `Stomach`, `Duodenum` | Endoscopy location applicability (`x` marks) |
+| `Terminal Ileum`, `IC Valve`, `Caecum`, ... `Anal Canal` | Colonoscopy location applicability (`x` marks) |
 | `Multi_Attribute` | Single-select vs multi-select |
 | `Default_Attr` | Pre-selected attribute |
 | `Conditional_on` | Show/hide based on other selections |
@@ -182,7 +191,7 @@ endo_ehr/
         ├── 02-csv-parser.js     # CSV → disease model
         ├── 03-hint-helpers.js   # Hint image rendering
         ├── 04-input-helpers.js  # Input field utilities
-        ├── 05-constants.js      # Sub-location matrices, constants
+        ├── 05-constants.js      # Sub-location matrices, procedure type locations, constants
         ├── 06-state.js          # All mutable global state
         ├── 07-conditional-logic.js  # Conditional visibility
         ├── 08-disease-columns.js    # Disease list rendering
@@ -194,11 +203,11 @@ endo_ehr/
         ├── 14-json-io.js            # JSON load/restore
         ├── 15-pdf-generation.js     # jsPDF report generation
         ├── 16-save-report.js        # Save/clear handlers
-        ├── 17-csv-upload.js         # CSV file loading
+        ├── 17-csv-upload.js         # CSV file loading, auto-load
         ├── 18-init.js               # App initialization
         ├── 19-voice.js              # Voice dictation pipeline
         ├── 20-sentences-report.js   # LLM prose report + Quill editor
-        └── 21-settings.js           # Settings: dark mode, display, study type
+        └── 21-settings.js           # Settings: dark mode, display, study type, procedure type
 ```
 
 ---
@@ -211,7 +220,7 @@ endo_ehr/
 
 # Build distributable
 python3 build.py
-# → Produces Endo_EHR.html (single file, ~136KB)
+# → Produces Endo_EHR.html (single file, ~146KB)
 ```
 
 ---

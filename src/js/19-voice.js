@@ -172,6 +172,7 @@ function _voiceConnect() {
       csv_text: loadedCsvText || "",
       report: report,
       overallRemarks: document.getElementById("overallRemarks").value || "",
+      procedure_type: procedureType || "endoscopy",
     };
     voiceWs.send(JSON.stringify(initMsg));
   };
