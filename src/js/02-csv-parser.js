@@ -160,4 +160,7 @@ function buildFromCSV(rows){
   });
 
   log('DISEASES model built with', Object.keys(DISEASES).length, 'diseases');
+
+  // Re-check voice button enabled state (DISEASES now populated)
+  if (typeof _voiceCheckEnabled === 'function') _voiceCheckEnabled();
 }
