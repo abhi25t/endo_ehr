@@ -36,6 +36,7 @@ project/
 ├── EHR_Menu - YYYYMMDD.csv     # Disease/section definitions
 ├── pipelines_figma.png         # Architecture diagram (voice pipeline design)
 │
+├── cert.pem / key.pem          # Self-signed SSL certificate (generated, not committed)
 ├── server.py                   # FastAPI backend: serves frontend + WebSocket voice endpoint
 ├── asr_bridge.py               # Google Cloud STT v2 streaming bridge (async/thread)
 ├── llm_caller.py               # Gemini 2.5 Flash: transcript → EHR JSON updates
@@ -90,10 +91,16 @@ project/
 ### Voice-Enabled Mode
 1. Install Python dependencies: `pip install -r requirements.txt`
 2. Set up Google Cloud credentials: `export GOOGLE_APPLICATION_CREDENTIALS=<your-key.json>`
-3. Start backend: `python server.py` (default port 8000, `--port N` for custom)
-4. Open `http://localhost:8000` in Chrome
-5. CSV auto-loads on start → Click "Start Dictation" → speak into microphone
-6. Voice features require HTTP (not file://) due to `getUserMedia` secure context requirement
+3. Generate SSL certificate (one-time): `openssl req -x509 -newkey rsa:2048 -keyout key.pem -out cert.pem -days 365 -nodes -subj "/CN=YOUR_IP"`
+4. Start backend: `python server.py` (default port 8000, `--port N` for custom)
+   - Auto-detects `cert.pem`/`key.pem` in project root → serves HTTPS
+   - Falls back to HTTP if cert files not found
+   - Custom cert: `python server.py --ssl-cert /path/to/cert.pem --ssl-key /path/to/key.pem`
+5. Open `https://YOUR_IP:8000` in Chrome (accept self-signed cert warning)
+   - For localhost-only use: `http://localhost:8000` works without SSL
+6. CSV auto-loads on start → Click "Start Dictation" → speak into microphone
+7. Voice features require HTTPS or localhost due to `getUserMedia` secure context requirement
+8. For intranet access, other machines use `https://SERVER_IP:8000`
 
 ## Voice Dictation Architecture
 

@@ -121,17 +121,23 @@ pip install -r requirements.txt
 # Set up Google Cloud credentials
 export GOOGLE_APPLICATION_CREDENTIALS=path/to/your-key.json
 
-# Start the server
+# Generate SSL certificate (one-time, needed for intranet/microphone access)
+openssl req -x509 -newkey rsa:2048 -keyout key.pem -out cert.pem -days 365 -nodes -subj "/CN=YOUR_IP"
+
+# Start the server (auto-detects cert.pem/key.pem for HTTPS)
 python server.py
 
 # Open in Chrome
-# http://localhost:8000
+# https://YOUR_IP:8000  (accept self-signed cert warning)
+# http://localhost:8000  (also works for local-only use)
 ```
 
 1. CSV auto-loads on start (or load manually from settings)
 2. Select Endoscopy or Colonoscopy in settings
 3. Click **Start Dictation**
 4. Speak findings naturally — the report fills itself
+
+> **Intranet access**: With SSL enabled, other machines on your network can use voice dictation at `https://SERVER_IP:8000`. Without SSL, microphone access only works on `localhost`.
 
 ---
 
@@ -235,6 +241,7 @@ python3 build.py
 - Google Cloud project with Speech-to-Text v2 and Vertex AI APIs enabled
 - Service account key with appropriate permissions
 - Chrome browser (microphone access requires HTTPS or localhost)
+- OpenSSL (for generating self-signed certificate for intranet use)
 
 ---
 

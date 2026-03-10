@@ -494,6 +494,18 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Endoscopy EHR Voice Server")
     parser.add_argument("--port", type=int, default=8000, help="Port to listen on")
     parser.add_argument("--host", default="0.0.0.0", help="Host to bind to")
+    parser.add_argument("--ssl-cert", default="cert.pem", help="Path to SSL certificate file")
+    parser.add_argument("--ssl-key", default="key.pem", help="Path to SSL key file")
     args = parser.parse_args()
 
-    uvicorn.run(app, host=args.host, port=args.port)
+    ssl_kwargs = {}
+    if args.ssl_cert and args.ssl_key:
+        import os
+        if os.path.isfile(args.ssl_cert) and os.path.isfile(args.ssl_key):
+            ssl_kwargs["ssl_certfile"] = args.ssl_cert
+            ssl_kwargs["ssl_keyfile"] = args.ssl_key
+            log.info(f"SSL enabled — open https://{args.host}:{args.port}")
+        else:
+            log.warning(f"SSL cert/key not found ({args.ssl_cert}, {args.ssl_key}) — falling back to HTTP")
+
+    uvicorn.run(app, host=args.host, port=args.port, **ssl_kwargs)
