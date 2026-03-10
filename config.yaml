@@ -1,0 +1,19 @@
+# Endo EHR Configuration
+# All fields are optional — missing values use hardcoded defaults.
+
+# SSL certificates for HTTPS (enables microphone on intranet)
+ssl:
+  cert: cert.pem
+  key: key.pem
+
+# CSV menu file path (relative to project root, or absolute)
+# If omitted, falls back to glob: latest EHR_Menu*.csv
+csv_file: "EHR_Menu - 20260226.csv"
+
+# Default frontend settings (gear button defaults)
+# Priority: config.yaml < localStorage < user interaction
+defaults:
+  procedure_type: colonoscopy      # endoscopy | colonoscopy
+  dark_mode: true               # true | false
+  study_type: prospective      # retrospective | prospective
+  display_mode: landscape        # landscape | portrait

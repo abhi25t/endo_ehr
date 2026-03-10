@@ -36,6 +36,7 @@ project/
 ├── EHR_Menu - YYYYMMDD.csv     # Disease/section definitions
 ├── pipelines_figma.png         # Architecture diagram (voice pipeline design)
 │
+├── config.yaml                 # Server & frontend defaults (SSL, CSV path, settings)
 ├── cert.pem / key.pem          # Self-signed SSL certificate (generated, not committed)
 ├── server.py                   # FastAPI backend: serves frontend + WebSocket voice endpoint
 ├── asr_bridge.py               # Google Cloud STT v2 streaming bridge (async/thread)
@@ -101,6 +102,40 @@ project/
 6. CSV auto-loads on start → Click "Start Dictation" → speak into microphone
 7. Voice features require HTTPS or localhost due to `getUserMedia` secure context requirement
 8. For intranet access, other machines use `https://SERVER_IP:8000`
+
+## Configuration (config.yaml)
+
+The server reads `config.yaml` from the project root on startup. All fields are optional — missing values use hardcoded defaults.
+
+```yaml
+ssl:
+  cert: cert.pem                       # SSL certificate path
+  key: key.pem                         # SSL key path
+
+csv_file: "EHR_Menu - 20260226.csv"    # CSV path (or omit for auto-glob)
+
+defaults:
+  procedure_type: endoscopy            # endoscopy | colonoscopy
+  dark_mode: false                     # true | false
+  study_type: retrospective            # retrospective | prospective
+  display_mode: landscape              # landscape | portrait
+```
+
+### Priority Order
+`config.yaml` defaults < `localStorage` saved values < user interaction in session
+
+### API Endpoint
+`GET /api/config` → returns frontend defaults as JSON:
+```json
+{"procedureType":"endoscopy","darkMode":false,"studyType":"retrospective","displayMode":"landscape"}
+```
+
+### Behavior
+- **SSL**: `ssl.cert`/`ssl.key` set argparse defaults; CLI `--ssl-cert`/`--ssl-key` still override
+- **CSV**: `csv_file` replaces glob-based auto-discovery in `/api/csv`; if omitted, falls back to latest `EHR_Menu*.csv`
+- **Frontend defaults**: Served via `/api/config`, applied before localStorage restore on page load
+- **No config.yaml**: Server starts with hardcoded defaults, logs a warning
+- **file:// mode**: `/api/config` fetch silently fails, falls through to hardcoded defaults
 
 ## Voice Dictation Architecture
 

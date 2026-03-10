@@ -132,10 +132,11 @@ python server.py
 # http://localhost:8000  (also works for local-only use)
 ```
 
-1. CSV auto-loads on start (or load manually from settings)
-2. Select Endoscopy or Colonoscopy in settings
-3. Click **Start Dictation**
-4. Speak findings naturally — the report fills itself
+1. Edit `config.yaml` to set your CSV file, SSL paths, and default settings
+2. CSV auto-loads on start (or load manually from settings)
+3. Select Endoscopy or Colonoscopy in settings
+4. Click **Start Dictation**
+5. Speak findings naturally — the report fills itself
 
 > **Intranet access**: With SSL enabled, other machines on your network can use voice dictation at `https://SERVER_IP:8000`. Without SSL, microphone access only works on `localhost`.
 
@@ -155,6 +156,28 @@ python server.py
 ### Why Vanilla JS?
 
 The app is distributed as a **single HTML file** (`Endo_EHR.html`). Doctors double-click it to open — no install, no npm, no build tools on their machines. The build script (`build.py`) inlines all 21 JS modules into one file. This is critical for deployment in hospital environments where IT restrictions prevent installing software.
+
+---
+
+## Configuration
+
+Edit `config.yaml` in the project root to configure the server and frontend defaults:
+
+```yaml
+ssl:
+  cert: cert.pem                       # SSL certificate path
+  key: key.pem                         # SSL key path
+
+csv_file: "EHR_Menu - 20260226.csv"    # CSV path (omit for auto-discovery)
+
+defaults:
+  procedure_type: endoscopy            # endoscopy | colonoscopy
+  dark_mode: false                     # true | false
+  study_type: retrospective            # retrospective | prospective
+  display_mode: landscape              # landscape | portrait
+```
+
+All fields are optional. Settings priority: **config.yaml < localStorage < user interaction**. The server serves defaults via `GET /api/config`; the frontend applies them on first load, then localStorage takes over.
 
 ---
 
@@ -182,6 +205,7 @@ Special attribute types: `int_box`, `float_box`, `alphanum_box`, `Range(start,en
 ```
 endo_ehr/
 ├── Endo_EHR.html            # Built distributable (double-click to open)
+├── config.yaml              # Server & frontend config (SSL, CSV path, defaults)
 ├── build.py                 # Inlines src/js/*.js into single HTML
 ├── server.py                # FastAPI: serves app + WebSocket voice endpoint
 ├── asr_bridge.py            # Google STT v2 streaming bridge

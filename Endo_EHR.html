@@ -4125,7 +4125,7 @@ function _wireProspectiveInputs() {
 
 /* ── Settings panel init ── */
 
-(function initSettings() {
+(async function initSettings() {
   const gearBtn = document.getElementById('settingsGearBtn');
   const panel = document.getElementById('settingsPanel');
 
@@ -4174,32 +4174,60 @@ function _wireProspectiveInputs() {
   // Prospective input listeners
   _wireProspectiveInputs();
 
-  // Restore saved settings from localStorage
-  if (localStorage.getItem('ehr_darkMode') === '1') {
-    toggleDarkMode();
+  // ── Fetch config defaults from server (HTTP mode only) ──
+  const isHttp = window.location.protocol === 'http:' || window.location.protocol === 'https:';
+  let configDefaults = null;
+  if (isHttp) {
+    try {
+      const resp = await fetch('/api/config');
+      if (resp.ok) configDefaults = await resp.json();
+    } catch (e) { /* server not available or file:// mode */ }
   }
 
-  const savedStudy = localStorage.getItem('ehr_studyType');
-  if (savedStudy && savedStudy !== 'retrospective') {
-    applyStudyType(savedStudy);
-  }
-
-  // Restore procedure type (lightweight: set state + UI, don't clear report or rebuild)
-  const savedProcedure = localStorage.getItem('ehr_procedureType');
-  if (savedProcedure && savedProcedure !== 'endoscopy') {
-    procedureType = savedProcedure;
+  // ── Helper: apply procedure type without clearing report (lightweight restore) ──
+  function _restoreProcedure(val) {
+    procedureType = val;
     document.querySelectorAll('input[name="procedureType"]').forEach(r => {
-      r.checked = (r.value === savedProcedure);
+      r.checked = (r.value === val);
     });
     const titleEl = document.getElementById('pageTitle');
     if (titleEl) {
-      titleEl.textContent = savedProcedure === 'colonoscopy' ? 'AIG Colonoscopy Report' : 'AIG Endoscopy Report';
+      titleEl.textContent = val === 'colonoscopy' ? 'AIG Colonoscopy Report' : 'AIG Endoscopy Report';
     }
     selectedMainLoc = getLocationsForProcedure()[0];
     _updateLandscapeAvailability();
-    if (savedProcedure === 'colonoscopy') {
-      applyDisplayMode('portrait');
+    if (val === 'colonoscopy') applyDisplayMode('portrait');
+  }
+
+  // ── Apply config defaults (before localStorage, so localStorage wins) ──
+  if (configDefaults) {
+    log('Config defaults from server:', configDefaults);
+    if (configDefaults.darkMode === true) toggleDarkMode();
+    if (configDefaults.studyType && configDefaults.studyType !== 'retrospective') {
+      applyStudyType(configDefaults.studyType);
     }
+    if (configDefaults.procedureType && configDefaults.procedureType !== 'endoscopy') {
+      _restoreProcedure(configDefaults.procedureType);
+    }
+    if (configDefaults.displayMode && configDefaults.displayMode !== 'landscape'
+        && configDefaults.displayMode !== displayMode) {
+      applyDisplayMode(configDefaults.displayMode);
+    }
+  }
+
+  // ── Restore from localStorage (overrides config defaults) ──
+  const savedDark = localStorage.getItem('ehr_darkMode');
+  if (savedDark === '1' && !darkMode) toggleDarkMode();
+  else if (savedDark === '0' && darkMode) toggleDarkMode();
+
+  const savedStudy = localStorage.getItem('ehr_studyType');
+  if (savedStudy && savedStudy !== studyType) {
+    applyStudyType(savedStudy);
+  }
+
+  const savedProcedure = localStorage.getItem('ehr_procedureType');
+  if (savedProcedure && savedProcedure !== procedureType) {
+    _restoreProcedure(savedProcedure);
   }
 
   // Display mode is NOT persisted — always starts in landscape (unless colonoscopy forces portrait)

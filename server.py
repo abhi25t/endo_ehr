@@ -18,6 +18,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
+import yaml
+
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -34,6 +36,25 @@ log = logging.getLogger("ehr-voice")
 PROJECT_DIR = Path(__file__).parent
 SRC_DIR = PROJECT_DIR / "src"
 PHRASESET_FILE = PROJECT_DIR / "endoscopy_phraseset.txt"
+CONFIG_FILE = PROJECT_DIR / "config.yaml"
+
+
+def _load_config() -> dict:
+    """Load config.yaml if it exists, return empty dict otherwise."""
+    if not CONFIG_FILE.exists():
+        log.info("No config.yaml found, using defaults")
+        return {}
+    try:
+        with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+            cfg = yaml.safe_load(f) or {}
+        log.info("Loaded config.yaml")
+        return cfg
+    except Exception as e:
+        log.warning("Failed to load config.yaml: %s", e)
+        return {}
+
+
+APP_CONFIG = _load_config()
 
 
 def _load_phrase_hints() -> list[str]:
@@ -69,13 +90,35 @@ from fastapi.responses import JSONResponse, Response
 
 @app.get("/api/csv")
 async def serve_csv():
-    """Serve the latest CSV file matching the EHR_Menu pattern."""
+    """Serve the CSV file from config.yaml, or latest EHR_Menu*.csv glob."""
+    csv_path_str = APP_CONFIG.get("csv_file")
+    if csv_path_str:
+        csv_path = Path(csv_path_str)
+        if not csv_path.is_absolute():
+            csv_path = PROJECT_DIR / csv_path
+        if not csv_path.is_file():
+            return Response(status_code=404,
+                            content=f"CSV file not found: {csv_path_str}")
+        return FileResponse(csv_path, media_type="text/csv",
+                            filename=csv_path.name)
+    # Fallback: glob for latest EHR_Menu*.csv
     csv_files = sorted(PROJECT_DIR.glob("EHR_Menu*.csv"))
     if not csv_files:
         return Response(status_code=404, content="No CSV file found")
-    # Return the most recent one (sorted alphabetically, date in name)
     return FileResponse(csv_files[-1], media_type="text/csv",
                         filename=csv_files[-1].name)
+
+
+@app.get("/api/config")
+async def serve_config():
+    """Serve frontend default settings from config.yaml."""
+    defaults = APP_CONFIG.get("defaults", {})
+    return JSONResponse(content={
+        "procedureType": defaults.get("procedure_type", "endoscopy"),
+        "darkMode": defaults.get("dark_mode", False),
+        "studyType": defaults.get("study_type", "retrospective"),
+        "displayMode": defaults.get("display_mode", "landscape"),
+    })
 
 
 # ── Sentences Report API ──
@@ -491,11 +534,15 @@ if __name__ == "__main__":
     import argparse
     import uvicorn
 
+    ssl_cfg = APP_CONFIG.get("ssl", {})
+
     parser = argparse.ArgumentParser(description="Endoscopy EHR Voice Server")
     parser.add_argument("--port", type=int, default=8000, help="Port to listen on")
     parser.add_argument("--host", default="0.0.0.0", help="Host to bind to")
-    parser.add_argument("--ssl-cert", default="cert.pem", help="Path to SSL certificate file")
-    parser.add_argument("--ssl-key", default="key.pem", help="Path to SSL key file")
+    parser.add_argument("--ssl-cert", default=ssl_cfg.get("cert", "cert.pem"),
+                        help="Path to SSL certificate file")
+    parser.add_argument("--ssl-key", default=ssl_cfg.get("key", "key.pem"),
+                        help="Path to SSL key file")
     args = parser.parse_args()
 
     ssl_kwargs = {}
