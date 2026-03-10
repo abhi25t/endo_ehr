@@ -62,7 +62,7 @@ project/
         ├── 02-csv-parser.js    # parseCSV(), expandRangeToken(), isX(), isMultiFlag(), buildFromCSV()
         ├── 03-hint-helpers.js  # createHintElement()
         ├── 04-input-helpers.js # parseAttributePattern(), groupHasAnyValue(), renderGroupLabel()
-        ├── 05-constants.js     # ENDO_LOCATIONS, COLONO_LOCATIONS, COLONO_SUBLOCATIONS, SUBLOCATIONS, STOMACH/DUODENUM matrices, getLocationsForProcedure(), getSublocationsForLocation(), VIDEO_EXTENSIONS, FPS
+        ├── 05-constants.js     # ENDO_LOCATIONS, COLONO_LOCATIONS, COLONO_SUBLOCATIONS, SUBLOCATIONS, STOMACH/DUODENUM matrices, PAGE_TITLES, getLocationsForProcedure(), getSublocationsForLocation(), _applyConfig(), VIDEO_EXTENSIONS, FPS — defaults overridden by /api/config
         ├── 06-state.js         # All mutable globals (DISEASES, report, active, retroData, loadedCsvText, procedureType, settings state, etc.)
         ├── 07-conditional-logic.js  # evaluateSingleCondition(), evaluateConditional()
         ├── 08-disease-columns.js    # populateColumns(), refreshLeftHighlights(), portrait variants
@@ -105,37 +105,139 @@ project/
 
 ## Configuration (config.yaml)
 
-The server reads `config.yaml` from the project root on startup. All fields are optional — missing values use hardcoded defaults.
+`config.yaml` is the **single source of truth** for all configuration. The server reads it on startup; all fields are optional — missing values use hardcoded defaults.
 
 ```yaml
+# Server
 ssl:
-  cert: cert.pem                       # SSL certificate path
-  key: key.pem                         # SSL key path
+  cert: cert.pem
+  key: key.pem
 
-csv_file: "EHR_Menu - 20260226.csv"    # CSV path (or omit for auto-glob)
+csv_file: "EHR_Menu - 20260226.csv"
 
+# Frontend defaults
 defaults:
   procedure_type: endoscopy            # endoscopy | colonoscopy
   dark_mode: false                     # true | false
   study_type: retrospective            # retrospective | prospective
   display_mode: landscape              # landscape | portrait
+
+# Page titles
+titles:
+  endoscopy: "AIG Endoscopy Report"
+  colonoscopy: "AIG Colonoscopy Report"
+
+# Video
+video:
+  fps: 25
+  extensions: [".mp4", ".avi", ".mov", ".mkv", ".wmv", ".flv", ".webm"]
+
+# ASR (Google Cloud Speech-to-Text v2)
+asr:
+  location: asia-southeast1
+  model: chirp_3
+  language_codes: ["en-IN", "hi-IN"]
+  sample_rate: 16000
+  max_phrases_per_set: 1200
+  phrase_boost: 5.0
+
+# LLM (Google Vertex AI Gemini)
+llm:
+  location: us-central1
+  model: gemini-2.5-flash
+  voice_temperature: 0.1
+  voice_max_tokens: 8192
+  sentences_temperature: 0.3
+  sentences_max_tokens: 8192
+
+# Voice pipeline
+voice:
+  debounce_seconds: 1.5
+  filler_words: ["um", "uh", "ah", "okay", "ok", "so", "like", "yeah", "yes", "hmm", "hm"]
+  commands:
+    pause: ["pause dictation", "stop recording", "pause"]
+    resume: ["resume dictation", "start recording", "resume"]
+    capture_photo: ["capture photo", "take photo", "take picture", "take a photo"]
+
+# Locations & sublocations (single source of truth for JS + Python)
+endoscopy:
+  locations: [Esophagus, GE Junction, Stomach, Duodenum]
+  sublocations:
+    Esophagus: [Cricopharynx, Upper, Middle, Lower, Whole esophagus, Anastomosis]
+    GE Junction: [Z-line, Hiatal hernia, Diaphragmatic pinch]
+    Stomach: null   # uses matrix
+    Duodenum: null  # uses matrix
+  matrices:
+    Stomach:
+      - region: Antrum
+        options: [Lesser Curvature, Greater Curvature, Posterior Wall, Anterior Wall, Entire]
+      # ... (see config.yaml for full structure)
+    Duodenum:
+      - region: D1 Bulb
+        options: [Anterior wall, Posterior wall, Superior wall, Inferior wall, Entire]
+      # ...
+
+colonoscopy:
+  locations: [Terminal Ileum, IC Valve, Caecum, Ascending Colon, ...]
+  sublocations:
+    Rectum: [Anterior wall, Posterior wall, Right Lateral wall, Left Lateral wall]
+    # other locations: []
+  matrices: {}
 ```
+
+### Config Sections
+
+| Section | Consumed by | Purpose |
+|---------|-------------|---------|
+| `ssl` | `server.py` (argparse defaults) | SSL cert/key paths |
+| `csv_file` | `server.py` (`/api/csv`) | CSV file path |
+| `defaults` | `server.py` → `21-settings.js` | Frontend setting defaults |
+| `titles` | `server.py` → `05-constants.js` | Page titles for header & PDFs |
+| `video` | `server.py` → `05-constants.js` | FPS, video file extensions |
+| `asr` | `server.py` → `asr_bridge.py` | STT location, model, languages, sample rate, phrase config |
+| `llm` | `server.py` → `llm_caller.py` | LLM location, model, temperature, max tokens |
+| `voice` | `server.py` | Debounce timer, filler words, voice command phrases |
+| `endoscopy` | `server.py` → `05-constants.js` + `schema_builder.py` | Locations, sublocations, matrices |
+| `colonoscopy` | `server.py` → `05-constants.js` + `schema_builder.py` | Locations, sublocations, matrices |
 
 ### Priority Order
-`config.yaml` defaults < `localStorage` saved values < user interaction in session
+`config.yaml` < `localStorage` saved values < user interaction in session
 
 ### API Endpoint
-`GET /api/config` → returns frontend defaults as JSON:
+`GET /api/config` → returns full frontend config as JSON:
 ```json
-{"procedureType":"endoscopy","darkMode":false,"studyType":"retrospective","displayMode":"landscape"}
+{
+  "procedureType": "endoscopy",
+  "darkMode": false,
+  "studyType": "retrospective",
+  "displayMode": "landscape",
+  "titles": {"endoscopy": "AIG Endoscopy Report", "colonoscopy": "AIG Colonoscopy Report"},
+  "video": {"fps": 25, "extensions": [".mp4", ...]},
+  "endoscopy": {"locations": [...], "sublocations": {...}, "matrices": {...}},
+  "colonoscopy": {"locations": [...], "sublocations": {...}, "matrices": {}}
+}
 ```
+
+### Config Flow
+
+**Backend (Python reads directly):**
+- `server.py` reads `voice`, `asr`, `llm` sections at module level → derives `FILLER_WORDS`, `VOICE_COMMANDS`, `DEBOUNCE_SECONDS`
+- Passes `asr` config to `asr_bridge.run_asr_bridge(ws, session, asr_config=...)`
+- Passes `llm` config to `llm_caller.call_llm(..., llm_config=...)` and `generate_sentences_report(..., llm_config=...)`
+- Passes full config to `schema_builder.build_schema(csv_text, procedure_type, config=...)`
+
+**Frontend (JS fetches from `/api/config`):**
+- `21-settings.js` fetches `/api/config` on page load
+- Calls `_applyConfig(cfg)` in `05-constants.js` to overwrite locations, sublocations, matrices, titles, FPS, video extensions
+- `PAGE_TITLES` global used by `15-pdf-generation.js`, `20-sentences-report.js`, `21-settings.js`
 
 ### Behavior
 - **SSL**: `ssl.cert`/`ssl.key` set argparse defaults; CLI `--ssl-cert`/`--ssl-key` still override
 - **CSV**: `csv_file` replaces glob-based auto-discovery in `/api/csv`; if omitted, falls back to latest `EHR_Menu*.csv`
-- **Frontend defaults**: Served via `/api/config`, applied before localStorage restore on page load
-- **No config.yaml**: Server starts with hardcoded defaults, logs a warning
-- **file:// mode**: `/api/config` fetch silently fails, falls through to hardcoded defaults
+- **Frontend config**: Served via `/api/config`, applied before localStorage restore on page load
+- **No config.yaml**: Server starts with hardcoded defaults, logs a warning. All Python modules and JS have built-in fallback defaults.
+- **file:// mode**: `/api/config` fetch silently fails, JS uses hardcoded defaults in `05-constants.js`
+- **Config passed as function args**: `asr_bridge.py` and `llm_caller.py` receive config via function parameters (not importing config.yaml themselves), keeping them testable
 
 ## Voice Dictation Architecture
 
@@ -191,17 +293,17 @@ applyVoiceUpdate(report)
 | Frontend Voice | `src/js/19-voice.js` | Audio capture, WebSocket client, applyVoiceUpdate(), UI |
 | Frontend Settings | `src/js/21-settings.js` | Dark mode, study type, display mode, portrait layout, localStorage |
 
-### Voice Command Keywords (Pre-LLM Detection)
+### Voice Command Keywords (Pre-LLM Detection, configurable via `config.yaml` → `voice.commands`)
 
-| Command | Trigger Phrases | Action |
-|---------|----------------|--------|
+| Command | Trigger Phrases (defaults) | Action |
+|---------|---------------------------|--------|
 | Pause | "pause dictation", "stop recording", "pause" | Stop sending finals to LLM; ASR continues for display |
 | Resume | "resume dictation", "start recording", "resume" | Resume LLM pipeline |
-| Capture Photo | "capture photo", "take photo", "take picture" | Dummy stub (logs to console) |
+| Capture Photo | "capture photo", "take photo", "take picture", "take a photo" | Dummy stub (logs to console) |
 
 ### Two-Layer Garbage Filtering
 
-1. **Pre-LLM (server.py)**: Skip transcripts with <2 meaningful words after removing filler ("um", "uh", "okay", etc.). Also intercepts voice commands before LLM.
+1. **Pre-LLM (server.py)**: Skip transcripts with <2 meaningful words after removing filler words (configurable via `config.yaml` → `voice.filler_words`). Also intercepts voice commands before LLM.
 2. **LLM Prompt**: Instructs Gemini to ignore non-medical chatter, past-tense references to other patients, non-Latin script (Hindi/Telugu side conversations), and return report unchanged when in doubt.
 
 ### WebSocket Protocol
@@ -227,22 +329,22 @@ applyVoiceUpdate(report)
 | `error` | `{message}` | Error notification |
 | `info` | `{message}` | Informational (e.g., "ASR stream restarted") |
 
-### ASR Configuration
+### ASR Configuration (configurable via `config.yaml` → `asr` section)
 
-- **Location**: `asia-southeast1`
-- **Model**: `chirp_3`
+- **Location**: `asia-southeast1` (default)
+- **Model**: `chirp_3` (default)
 - **Languages**: `["en-IN", "hi-IN"]` (Chirp3 max 2 language codes)
 - **Sample rate**: 16kHz mono PCM Int16
 - **Phrase hints**: Loaded from `endoscopy_phraseset.txt` (manually curated), max 1200 per PhraseSet, boost=5.0
 - **Auto-restart**: On 5-minute STT stream timeout (OutOfRange exception)
 
-### LLM Configuration
+### LLM Configuration (configurable via `config.yaml` → `llm` section)
 
-- **Location**: `us-central1`
-- **Model**: `gemini-2.5-flash`
-- **Temperature**: 0.1
-- **Max output tokens**: 8192
-- **Response format**: `application/json` (constrained decoding)
+- **Location**: `us-central1` (default)
+- **Model**: `gemini-2.5-flash` (default)
+- **Voice temperature**: 0.1 (default) / **Sentences temperature**: 0.3 (default)
+- **Max output tokens**: 8192 (default, for both voice and sentences)
+- **Response format**: `application/json` (constrained decoding, voice only)
 - **Prompt strategy**: Single-shot with schema + current report state + transcript each call
 
 ### Manual Edit Sync
@@ -706,6 +808,7 @@ Validation pipeline: Parse JSON → Pydantic model_validate → strip invalid lo
 21. ✅ Procedure type toggle (endoscopy/colonoscopy) with localStorage persistence
 22. ✅ CSV auto-load on page start (server `/api/csv` + file:// fallback)
 23. ✅ CSV file input moved to settings panel
+24. ✅ Centralized config.yaml — all hardcoded constants (locations, sublocations, matrices, ASR/LLM config, titles, FPS, voice commands, filler words, debounce) moved to config.yaml as single source of truth for both JS and Python
 
 ## Development Notes
 
@@ -740,12 +843,12 @@ Backend logging: Python `logging` module, logger name `"ehr-voice"`, level INFO.
 | `applyVoiceUpdate(data)` | `19-voice` | Apply LLM-produced report update to UI |
 | `_voiceStart()` / `_voiceStop()` | `19-voice` | Start/stop dictation (audio + WebSocket) |
 | `voiceScheduleSync()` | `19-voice` | Debounced sync of manual edits to backend |
-| `build_schema(csv_text, procedure_type)` | `schema_builder` | CSV → canonical EHR schema dict (filtered by procedure type) |
-| `call_llm(schema, report, remarks, transcript, procedure_type)` | `llm_caller` | Gemini call to update EHR from transcript |
+| `build_schema(csv_text, procedure_type, config)` | `schema_builder` | CSV → canonical EHR schema dict (filtered by procedure type, locations from config) |
+| `call_llm(schema, report, remarks, transcript, procedure_type, llm_config)` | `llm_caller` | Gemini call to update EHR from transcript |
 | `validate_llm_response(data, schema)` | `models` | Pydantic validation of LLM output |
-| `run_asr_bridge(ws, session)` | `asr_bridge` | Main ASR entry point (async task) |
+| `run_asr_bridge(ws, session, asr_config)` | `asr_bridge` | Main ASR entry point (async task) |
 | `transcript_batcher(ws, session)` | `server` | Debounce + batch finals → LLM calls |
-| `generate_sentences_report(json)` | `llm_caller` | Gemini call to convert EHR JSON → prose HTML |
+| `generate_sentences_report(json, llm_config)` | `llm_caller` | Gemini call to convert EHR JSON → prose HTML |
 | `_sentencesGenerate()` | `20-sentences-report` | Main handler: modal + API call + Quill init |
 | `_sentencesGeneratePdf()` | `20-sentences-report` | html2pdf.js PDF generation from Quill content |
 | `toggleDarkMode()` | `21-settings` | Toggle dark mode on/off, update CSS class + localStorage |
@@ -759,9 +862,17 @@ Backend logging: Python `logging` module, logger name `"ehr-voice"`, level INFO.
 | `autoLoadCsv()` | `17-csv-upload` | Auto-fetch CSV on page load (server API or file://) |
 | `getLocationsForProcedure()` | `05-constants` | Return location array for current procedure type |
 | `getSublocationsForLocation(loc)` | `05-constants` | Return sub-location array for a given location |
+| `_applyConfig(cfg)` | `05-constants` | Apply `/api/config` response to overwrite locations, matrices, titles, FPS |
 
 ### Adding New Matrix Locations
 
+**Via config.yaml (preferred):**
+1. Set the location's sublocation to `null` in the `endoscopy.sublocations` (or `colonoscopy.sublocations`) section
+2. Add matrix rows under `endoscopy.matrices.LocationName` (or `colonoscopy.matrices`)
+3. Use `heading: true` for heading rows (non-selectable region labels)
+4. Restart server — JS picks up the new matrix via `/api/config`
+
+**Via JS (fallback for file:// mode):**
 1. Set location to `null` in `SUBLOCATIONS` (`src/js/05-constants.js`)
 2. Create matrix constant (e.g., `NEW_SUBLOC_MATRIX`) in same file
 3. Add condition in `renderSubLocChips()` (`src/js/09-sublocation-ui.js`):

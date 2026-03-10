@@ -15,7 +15,7 @@ function applyProcedureType(type) {
   // Update page title
   const titleEl = document.getElementById('pageTitle');
   if (titleEl) {
-    titleEl.textContent = type === 'colonoscopy' ? 'AIG Colonoscopy Report' : 'AIG Endoscopy Report';
+    titleEl.textContent = PAGE_TITLES[type] || PAGE_TITLES.endoscopy;
   }
 
   // Colonoscopy forces portrait mode; disable landscape radio
@@ -404,6 +404,11 @@ function _wireProspectiveInputs() {
     } catch (e) { /* server not available or file:// mode */ }
   }
 
+  // Apply locations, sublocations, matrices, titles, video from config
+  if (configDefaults && typeof _applyConfig === 'function') {
+    _applyConfig(configDefaults);
+  }
+
   // ── Helper: apply procedure type without clearing report (lightweight restore) ──
   function _restoreProcedure(val) {
     procedureType = val;
@@ -412,7 +417,7 @@ function _wireProspectiveInputs() {
     });
     const titleEl = document.getElementById('pageTitle');
     if (titleEl) {
-      titleEl.textContent = val === 'colonoscopy' ? 'AIG Colonoscopy Report' : 'AIG Endoscopy Report';
+      titleEl.textContent = PAGE_TITLES[val] || PAGE_TITLES.endoscopy;
     }
     selectedMainLoc = getLocationsForProcedure()[0];
     _updateLandscapeAvailability();

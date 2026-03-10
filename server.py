@@ -56,6 +56,27 @@ def _load_config() -> dict:
 
 APP_CONFIG = _load_config()
 
+# ── Derived config sections ──
+_voice_cfg = APP_CONFIG.get("voice", {})
+_asr_cfg = APP_CONFIG.get("asr", {})
+_llm_cfg = APP_CONFIG.get("llm", {})
+
+FILLER_WORDS = set(_voice_cfg.get("filler_words",
+    ["um", "uh", "ah", "okay", "ok", "so", "like", "yeah", "yes", "hmm", "hm"]))
+
+_cmd_cfg = _voice_cfg.get("commands", {})
+VOICE_COMMANDS = set(
+    _cmd_cfg.get("pause", ["pause dictation", "stop recording", "pause"])
+    + _cmd_cfg.get("resume", ["resume dictation", "start recording", "resume"])
+    + _cmd_cfg.get("capture_photo", ["capture photo", "take photo", "take picture", "take a photo"])
+)
+_PAUSE_CMDS = set(_cmd_cfg.get("pause", ["pause dictation", "stop recording", "pause"]))
+_RESUME_CMDS = set(_cmd_cfg.get("resume", ["resume dictation", "start recording", "resume"]))
+_CAPTURE_CMDS = set(_cmd_cfg.get("capture_photo",
+    ["capture photo", "take photo", "take picture", "take a photo"]))
+
+DEBOUNCE_SECONDS = _voice_cfg.get("debounce_seconds", 1.5)
+
 
 def _load_phrase_hints() -> list[str]:
     """Load phrase hints from endoscopy_phraseset.txt (one phrase per line)."""
@@ -111,13 +132,57 @@ async def serve_csv():
 
 @app.get("/api/config")
 async def serve_config():
-    """Serve frontend default settings from config.yaml."""
+    """Serve frontend config from config.yaml (defaults + locations + titles + video)."""
     defaults = APP_CONFIG.get("defaults", {})
+    titles = APP_CONFIG.get("titles", {})
+    video = APP_CONFIG.get("video", {})
+    endo = APP_CONFIG.get("endoscopy", {})
+    colono = APP_CONFIG.get("colonoscopy", {})
+
+    # Build matrices in JS-friendly format (heading → isHeading)
+    def _convert_matrices(raw):
+        if not raw:
+            return {}
+        out = {}
+        for loc, rows in raw.items():
+            if not isinstance(rows, list):
+                continue
+            out[loc] = []
+            for r in rows:
+                out[loc].append({
+                    "region": r.get("region", ""),
+                    "isHeading": bool(r.get("heading", False)),
+                    "options": r.get("options", []),
+                })
+        return out
+
     return JSONResponse(content={
         "procedureType": defaults.get("procedure_type", "endoscopy"),
         "darkMode": defaults.get("dark_mode", False),
         "studyType": defaults.get("study_type", "retrospective"),
         "displayMode": defaults.get("display_mode", "landscape"),
+        "titles": {
+            "endoscopy": titles.get("endoscopy", "AIG Endoscopy Report"),
+            "colonoscopy": titles.get("colonoscopy", "AIG Colonoscopy Report"),
+        },
+        "video": {
+            "fps": video.get("fps", 25),
+            "extensions": video.get("extensions",
+                [".mp4", ".avi", ".mov", ".mkv", ".wmv", ".flv", ".webm"]),
+        },
+        "endoscopy": {
+            "locations": endo.get("locations",
+                ["Esophagus", "GE Junction", "Stomach", "Duodenum"]),
+            "sublocations": endo.get("sublocations", {}),
+            "matrices": _convert_matrices(endo.get("matrices", {})),
+        },
+        "colonoscopy": {
+            "locations": colono.get("locations",
+                ["Terminal Ileum", "IC Valve", "Caecum", "Ascending Colon",
+                 "Transverse Colon", "Descending Colon", "Sigmoid", "Rectum", "Anal Canal"]),
+            "sublocations": colono.get("sublocations", {}),
+            "matrices": _convert_matrices(colono.get("matrices", {})),
+        },
     })
 
 
@@ -138,7 +203,7 @@ async def api_generate_report(request: Request):
 
     try:
         from llm_caller import generate_sentences_report
-        result = await generate_sentences_report(report_data)
+        result = await generate_sentences_report(report_data, llm_config=_llm_cfg)
         if result is None:
             return JSONResponse(status_code=500, content={"error": "LLM returned empty response"})
         return JSONResponse(content={"html": result})
@@ -150,15 +215,6 @@ async def api_generate_report(request: Request):
 
 
 # ── Session state per WebSocket connection ──
-
-FILLER_WORDS = {"um", "uh", "ah", "okay", "ok", "so", "like", "yeah", "yes", "hmm", "hm"}
-
-VOICE_COMMANDS = {
-    "pause dictation", "stop recording", "pause",
-    "resume dictation", "start recording", "resume",
-    "capture photo", "take photo", "take picture", "take a photo",
-}
-
 
 @dataclass
 class SessionState:
@@ -203,9 +259,6 @@ async def send_safe(ws: WebSocket, data: dict):
 
 
 # ── Transcript Batcher ──
-
-DEBOUNCE_SECONDS = 1.5
-
 
 async def transcript_batcher(ws: WebSocket, session: SessionState):
     """
@@ -373,15 +426,15 @@ async def _handle_voice_command(ws: WebSocket, session: SessionState, cmd: str, 
     """Handle a detected voice command."""
     await send_safe(ws, {"type": "final_transcript", "text": text})
 
-    if cmd in ("pause dictation", "stop recording", "pause"):
+    if cmd in _PAUSE_CMDS:
         session.paused = True
         await send_safe(ws, {"type": "status", "paused": True})
         log.info("Dictation paused by voice command")
-    elif cmd in ("resume dictation", "start recording", "resume"):
+    elif cmd in _RESUME_CMDS:
         session.paused = False
         await send_safe(ws, {"type": "status", "paused": False})
         log.info("Dictation resumed by voice command")
-    elif cmd in ("capture photo", "take photo", "take picture", "take a photo"):
+    elif cmd in _CAPTURE_CMDS:
         await send_safe(ws, {"type": "capture_photo"})
         log.info("Capture photo command received")
 
@@ -399,6 +452,7 @@ async def call_llm_wrapper(session: SessionState, transcript: str) -> dict | Non
             session.overall_remarks,
             transcript,
             procedure_type=session.procedure_type,
+            llm_config=_llm_cfg,
         )
         if result is None:
             log.warning("LLM returned None for transcript: %s", transcript[:80])
@@ -449,7 +503,8 @@ async def voice_ws(ws: WebSocket):
         csv_text = init_data.get("csv_text", "")
         procedure_type = init_data.get("procedure_type", "endoscopy")
         if csv_text:
-            session.ehr_schema = build_schema(csv_text, procedure_type=procedure_type)
+            session.ehr_schema = build_schema(
+                csv_text, procedure_type=procedure_type, config=APP_CONFIG)
             session.phrase_hints = _load_phrase_hints()
             log.info(
                 "Schema built: %d diseases, %d phrase hints",
@@ -467,7 +522,7 @@ async def voice_ws(ws: WebSocket):
         try:
             from asr_bridge import run_asr_bridge
             asr_task = asyncio.create_task(
-                run_asr_bridge(ws, session)
+                run_asr_bridge(ws, session, asr_config=_asr_cfg)
             )
             session.tasks.append(asr_task)
             log.info("ASR bridge started")

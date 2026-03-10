@@ -53,7 +53,7 @@ function generatePDF(data, filename) {
   doc.setFontSize(18);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(30, 64, 175); // Blue color
-  const pdfTitle = procedureType === 'colonoscopy' ? 'AIG Colonoscopy Report' : 'AIG Endoscopy Report';
+  const pdfTitle = PAGE_TITLES[procedureType] || PAGE_TITLES.endoscopy;
   doc.text(pdfTitle, pageWidth / 2, yPos, { align: 'center' });
   yPos += 12;
   doc.setTextColor(0, 0, 0); // Reset to black

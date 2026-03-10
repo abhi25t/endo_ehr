@@ -17,3 +17,86 @@ defaults:
   dark_mode: true               # true | false
   study_type: prospective      # retrospective | prospective
   display_mode: landscape        # landscape | portrait
+
+# Page titles (shown in header and PDFs)
+titles:
+  endoscopy: "AIG Endoscopy Report"
+  colonoscopy: "AIG Colonoscopy Report"
+
+# Video settings
+video:
+  fps: 25
+  extensions: [".mp4", ".avi", ".mov", ".mkv", ".wmv", ".flv", ".webm"]
+
+# ASR (Google Cloud Speech-to-Text v2)
+asr:
+  location: asia-southeast1
+  model: chirp_3
+  language_codes: ["en-IN", "hi-IN"]
+  sample_rate: 16000
+  max_phrases_per_set: 1200
+  phrase_boost: 5.0
+
+# LLM (Google Vertex AI Gemini)
+llm:
+  location: us-central1
+  model: gemini-2.5-flash
+  voice_temperature: 0.1
+  voice_max_tokens: 8192
+  sentences_temperature: 0.3
+  sentences_max_tokens: 8192
+
+# Voice pipeline
+voice:
+  debounce_seconds: 1.5
+  filler_words: ["um", "uh", "ah", "okay", "ok", "so", "like", "yeah", "yes", "hmm", "hm"]
+  commands:
+    pause: ["pause dictation", "stop recording", "pause"]
+    resume: ["resume dictation", "start recording", "resume"]
+    capture_photo: ["capture photo", "take photo", "take picture", "take a photo"]
+
+# Locations & sublocations (single source of truth for JS + Python)
+endoscopy:
+  locations: [Esophagus, GE Junction, Stomach, Duodenum]
+  sublocations:
+    Esophagus: [Cricopharynx, Upper, Middle, Lower, Whole esophagus, Anastomosis]
+    GE Junction: [Z-line, Hiatal hernia, Diaphragmatic pinch]
+    Stomach: null   # uses matrix
+    Duodenum: null  # uses matrix
+  matrices:
+    Stomach:
+      - region: Antrum
+        options: [Lesser Curvature, Greater Curvature, Posterior Wall, Anterior Wall, Entire]
+      - region: Incisura
+        options: [Lesser Curvature, Posterior Wall, Anterior Wall, Entire]
+      - region: Lower Body
+        options: [Lesser Curvature, Greater Curvature, Posterior Wall, Anterior Wall, Entire]
+      - region: Middle Upper Body
+        options: [Lesser Curvature, Greater Curvature, Posterior Wall, Anterior Wall, Entire]
+      - region: Fundus
+        options: [Lesser Curvature, Greater Curvature, Posterior Wall, Anterior Wall, Entire]
+      - region: Other
+        heading: true
+        options: [Whole Stomach, Whole Body, Cardia, Prepyloric region, Pylorus, Anastomosis]
+    Duodenum:
+      - region: D1 Bulb
+        options: [Anterior wall, Posterior wall, Superior wall, Inferior wall, Entire]
+      - region: D2
+        options: [Ampullary region, Medial wall, Lateral wall, Inferior wall, Superior wall, Entire]
+      - region: Other
+        heading: true
+        options: [D1-D2 junction, D3, D4, Anastomosis, Major papilla, Minor papilla]
+
+colonoscopy:
+  locations: [Terminal Ileum, IC Valve, Caecum, Ascending Colon, Transverse Colon, Descending Colon, Sigmoid, Rectum, Anal Canal]
+  sublocations:
+    Terminal Ileum: []
+    IC Valve: []
+    Caecum: []
+    Ascending Colon: []
+    Transverse Colon: []
+    Descending Colon: []
+    Sigmoid: []
+    Rectum: [Anterior wall, Posterior wall, Right Lateral wall, Left Lateral wall]
+    Anal Canal: []
+  matrices: {}

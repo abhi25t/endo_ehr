@@ -15,9 +15,15 @@ import io
 from collections import OrderedDict
 
 
-# ── Sublocation constants (must match src/js/05-constants.js) ──
+# ── Defaults (used when no config dict is passed) ──
 
-ENDO_SUBLOCATIONS = {
+_DEFAULT_ENDO_LOCATIONS = ["Esophagus", "GE Junction", "Stomach", "Duodenum"]
+_DEFAULT_COLONO_LOCATIONS = [
+    "Terminal Ileum", "IC Valve", "Caecum", "Ascending Colon",
+    "Transverse Colon", "Descending Colon", "Sigmoid", "Rectum", "Anal Canal",
+]
+
+_DEFAULT_ENDO_SUBLOCATIONS = {
     "Esophagus": ["Cricopharynx", "Upper", "Middle", "Lower", "Whole esophagus", "Anastomosis"],
     "GE Junction": ["Z-line", "Hiatal hernia", "Diaphragmatic pinch"],
     "Stomach": {
@@ -35,7 +41,7 @@ ENDO_SUBLOCATIONS = {
     },
 }
 
-COLONO_SUBLOCATIONS = {
+_DEFAULT_COLONO_SUBLOCATIONS = {
     "Terminal Ileum": [],
     "IC Valve": [],
     "Caecum": [],
@@ -47,11 +53,35 @@ COLONO_SUBLOCATIONS = {
     "Anal Canal": [],
 }
 
-ENDO_LOCATION_COLS = ["Esophagus", "GE Junction", "Stomach", "Duodenum"]
-COLONO_LOCATION_COLS = [
-    "Terminal Ileum", "IC Valve", "Caecum", "Ascending Colon",
-    "Transverse Colon", "Descending Colon", "Sigmoid", "Rectum", "Anal Canal",
-]
+
+def _sublocations_from_config(cfg_section: dict) -> dict:
+    """Build sublocation dict from config, converting matrices to schema format.
+
+    Config has separate 'sublocations' (simple lists) and 'matrices' (region/options).
+    For locations with matrices (sublocation value is null), we convert matrices
+    into the dict-of-lists format the schema expects (region → options, plus _standalone).
+    """
+    raw_sublocs = cfg_section.get("sublocations", {})
+    matrices = cfg_section.get("matrices", {})
+
+    result = {}
+    for loc, sublocs in raw_sublocs.items():
+        if sublocs is None and loc in matrices:
+            # Convert matrix format to schema format
+            mat_dict = {}
+            for row in matrices[loc]:
+                region = row.get("region", "")
+                options = row.get("options", [])
+                is_heading = row.get("heading", False)
+                if is_heading:
+                    mat_dict["_standalone"] = options
+                else:
+                    mat_dict[region] = options
+            result[loc] = mat_dict
+        else:
+            result[loc] = sublocs if sublocs is not None else []
+
+    return result
 
 
 def _is_x(val: str) -> bool:
@@ -69,9 +99,15 @@ def _extract_attributes(row: dict) -> list[str]:
     return attrs
 
 
-def build_schema(csv_text: str, procedure_type: str = "endoscopy") -> dict:
+def build_schema(csv_text: str, procedure_type: str = "endoscopy",
+                  config: dict | None = None) -> dict:
     """
     Parse CSV text and produce a canonical EHR schema for the LLM.
+
+    Args:
+        csv_text: Raw CSV content
+        procedure_type: "endoscopy" or "colonoscopy"
+        config: Optional config dict (from config.yaml) for locations/sublocations
 
     Returns:
         {
@@ -99,8 +135,16 @@ def build_schema(csv_text: str, procedure_type: str = "endoscopy") -> dict:
         }
     """
     is_colono = procedure_type == "colonoscopy"
-    location_cols = COLONO_LOCATION_COLS if is_colono else ENDO_LOCATION_COLS
-    sublocations = COLONO_SUBLOCATIONS if is_colono else ENDO_SUBLOCATIONS
+    cfg = config or {}
+    cfg_section = cfg.get("colonoscopy" if is_colono else "endoscopy", {})
+
+    if cfg_section:
+        location_cols = cfg_section.get("locations",
+            _DEFAULT_COLONO_LOCATIONS if is_colono else _DEFAULT_ENDO_LOCATIONS)
+        sublocations = _sublocations_from_config(cfg_section)
+    else:
+        location_cols = _DEFAULT_COLONO_LOCATIONS if is_colono else _DEFAULT_ENDO_LOCATIONS
+        sublocations = _DEFAULT_COLONO_SUBLOCATIONS if is_colono else _DEFAULT_ENDO_SUBLOCATIONS
 
     reader = csv.DictReader(io.StringIO(csv_text))
 

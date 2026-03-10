@@ -14,21 +14,34 @@ from vertexai.generative_models import GenerativeModel, GenerationConfig
 
 log = logging.getLogger("ehr-voice")
 
-# ── Config ──
-LLM_LOCATION = "us-central1"
-LLM_MODEL = "gemini-2.5-flash"
+# ── Defaults (overridden by llm_config dict passed to call_llm / generate_sentences_report) ──
+_DEFAULT_LLM_LOCATION = "us-central1"
+_DEFAULT_LLM_MODEL = "gemini-2.5-flash"
+_DEFAULT_VOICE_TEMP = 0.1
+_DEFAULT_VOICE_MAX_TOKENS = 8192
+_DEFAULT_SENTENCES_TEMP = 0.3
+_DEFAULT_SENTENCES_MAX_TOKENS = 8192
 
 # ── Lazy init ──
 _model = None
+_init_location = None
+_init_model_name = None
 
 
-def _get_model() -> GenerativeModel:
-    global _model
-    if _model is None:
+def _get_model(llm_config: dict | None = None) -> GenerativeModel:
+    global _model, _init_location, _init_model_name
+    cfg = llm_config or {}
+    location = cfg.get("location", _DEFAULT_LLM_LOCATION)
+    model_name = cfg.get("model", _DEFAULT_LLM_MODEL)
+
+    # Re-init if config changed
+    if _model is None or location != _init_location or model_name != _init_model_name:
         creds, project_id = default()
-        vertexai.init(project=project_id, location=LLM_LOCATION)
-        _model = GenerativeModel(LLM_MODEL)
-        log.info("Gemini model initialized: %s @ %s", LLM_MODEL, LLM_LOCATION)
+        vertexai.init(project=project_id, location=location)
+        _model = GenerativeModel(model_name)
+        _init_location = location
+        _init_model_name = model_name
+        log.info("Gemini model initialized: %s @ %s", model_name, location)
     return _model
 
 
@@ -134,6 +147,7 @@ async def call_llm(
     overall_remarks: str,
     transcript: str,
     procedure_type: str = "endoscopy",
+    llm_config: dict | None = None,
 ) -> dict | None:
     """
     Call Gemini to update EHR report from transcript.
@@ -141,14 +155,15 @@ async def call_llm(
     Returns:
         dict with {"report": {...}, "overallRemarks": "..."} or None on failure.
     """
-    model = _get_model()
+    cfg = llm_config or {}
+    model = _get_model(llm_config)
 
     system_prompt = _get_system_prompt(procedure_type)
     user_prompt = _build_prompt(schema, current_report, overall_remarks, transcript)
 
     generation_config = GenerationConfig(
-        temperature=0.1,
-        max_output_tokens=8192,
+        temperature=cfg.get("voice_temperature", _DEFAULT_VOICE_TEMP),
+        max_output_tokens=cfg.get("voice_max_tokens", _DEFAULT_VOICE_MAX_TOKENS),
         response_mime_type="application/json",
     )
 
@@ -222,23 +237,26 @@ FORMAT your output as HTML:
 """
 
 
-async def generate_sentences_report(report_json: dict) -> str | None:
+async def generate_sentences_report(report_json: dict,
+                                    llm_config: dict | None = None) -> str | None:
     """
     Call Gemini to convert structured EHR JSON into natural language sentences.
 
     Args:
         report_json: The report data (report, overallRemarks, optionally __retroMeta)
+        llm_config: Optional LLM configuration dict from config.yaml
 
     Returns:
         HTML string with formatted sentences report, or None on failure.
     """
-    model = _get_model()
+    cfg = llm_config or {}
+    model = _get_model(llm_config)
 
     user_prompt = json.dumps(report_json, indent=2, ensure_ascii=False)
 
     generation_config = GenerationConfig(
-        temperature=0.3,
-        max_output_tokens=8192,
+        temperature=cfg.get("sentences_temperature", _DEFAULT_SENTENCES_TEMP),
+        max_output_tokens=cfg.get("sentences_max_tokens", _DEFAULT_SENTENCES_MAX_TOKENS),
     )
 
     log.info("Sentences report LLM call: %d chars input", len(user_prompt))

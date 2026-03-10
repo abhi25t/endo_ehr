@@ -161,23 +161,63 @@ The app is distributed as a **single HTML file** (`Endo_EHR.html`). Doctors doub
 
 ## Configuration
 
-Edit `config.yaml` in the project root to configure the server and frontend defaults:
+Edit `config.yaml` in the project root — it is the **single source of truth** for all configuration, including locations, sublocations, matrices, ASR/LLM settings, voice commands, and UI defaults:
 
 ```yaml
 ssl:
-  cert: cert.pem                       # SSL certificate path
-  key: key.pem                         # SSL key path
+  cert: cert.pem
+  key: key.pem
 
-csv_file: "EHR_Menu - 20260226.csv"    # CSV path (omit for auto-discovery)
+csv_file: "EHR_Menu - 20260226.csv"
 
 defaults:
   procedure_type: endoscopy            # endoscopy | colonoscopy
-  dark_mode: false                     # true | false
+  dark_mode: false
   study_type: retrospective            # retrospective | prospective
   display_mode: landscape              # landscape | portrait
+
+titles:
+  endoscopy: "AIG Endoscopy Report"
+  colonoscopy: "AIG Colonoscopy Report"
+
+video:
+  fps: 25
+  extensions: [".mp4", ".avi", ".mov", ".mkv", ".wmv", ".flv", ".webm"]
+
+asr:                                   # Google Cloud Speech-to-Text
+  location: asia-southeast1
+  model: chirp_3
+  language_codes: ["en-IN", "hi-IN"]
+  sample_rate: 16000
+
+llm:                                   # Google Vertex AI Gemini
+  location: us-central1
+  model: gemini-2.5-flash
+  voice_temperature: 0.1
+  sentences_temperature: 0.3
+
+voice:
+  debounce_seconds: 1.5
+  filler_words: ["um", "uh", "ah", "okay", "ok", "so", "like", "yeah", "yes", "hmm", "hm"]
+  commands:
+    pause: ["pause dictation", "stop recording", "pause"]
+    resume: ["resume dictation", "start recording", "resume"]
+    capture_photo: ["capture photo", "take photo", "take picture", "take a photo"]
+
+endoscopy:                             # Locations & sublocations
+  locations: [Esophagus, GE Junction, Stomach, Duodenum]
+  sublocations:
+    Esophagus: [Cricopharynx, Upper, Middle, Lower, Whole esophagus, Anastomosis]
+    # ... (see config.yaml for full structure including matrices)
+
+colonoscopy:
+  locations: [Terminal Ileum, IC Valve, Caecum, ..., Rectum, Anal Canal]
+  sublocations:
+    Rectum: [Anterior wall, Posterior wall, Right Lateral wall, Left Lateral wall]
+    # other locations: []
 ```
 
-All fields are optional. Settings priority: **config.yaml < localStorage < user interaction**. The server serves defaults via `GET /api/config`; the frontend applies them on first load, then localStorage takes over.
+All fields are optional — missing values use hardcoded defaults. Settings priority: **config.yaml < localStorage < user interaction**. The server serves frontend config via `GET /api/config`; Python modules receive backend config via function parameters. Both JS and Python share the same location/sublocation definitions from config.yaml, eliminating duplication.
 
 ---
 
@@ -205,7 +245,7 @@ Special attribute types: `int_box`, `float_box`, `alphanum_box`, `Range(start,en
 ```
 endo_ehr/
 ├── Endo_EHR.html            # Built distributable (double-click to open)
-├── config.yaml              # Server & frontend config (SSL, CSV path, defaults)
+├── config.yaml              # Single source of truth: SSL, CSV, ASR/LLM, voice, locations, titles
 ├── build.py                 # Inlines src/js/*.js into single HTML
 ├── server.py                # FastAPI: serves app + WebSocket voice endpoint
 ├── asr_bridge.py            # Google STT v2 streaming bridge
@@ -221,7 +261,7 @@ endo_ehr/
         ├── 02-csv-parser.js     # CSV → disease model
         ├── 03-hint-helpers.js   # Hint image rendering
         ├── 04-input-helpers.js  # Input field utilities
-        ├── 05-constants.js      # Sub-location matrices, procedure type locations, constants
+        ├── 05-constants.js      # Locations, sublocations, matrices, titles, FPS (defaults overridden by /api/config)
         ├── 06-state.js          # All mutable global state
         ├── 07-conditional-logic.js  # Conditional visibility
         ├── 08-disease-columns.js    # Disease list rendering

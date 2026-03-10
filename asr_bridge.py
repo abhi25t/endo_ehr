@@ -33,23 +33,25 @@ from google.cloud.speech_v2.types import cloud_speech as cloud_speech_types
 
 log = logging.getLogger("ehr-voice")
 
-# ── Config ──
-STT_LOCATION = "asia-southeast1"
-MODEL = "chirp_3"
-LANGUAGE_CODES = ["en-IN", "hi-IN"]
-SAMPLE_RATE = 16000
-MAX_PHRASES_PER_SET = 1200
+# ── Defaults (overridden by config dict passed to run_asr_bridge) ──
+_DEFAULT_STT_LOCATION = "asia-southeast1"
+_DEFAULT_MODEL = "chirp_3"
+_DEFAULT_LANGUAGE_CODES = ["en-IN", "hi-IN"]
+_DEFAULT_SAMPLE_RATE = 16000
+_DEFAULT_MAX_PHRASES_PER_SET = 1200
+_DEFAULT_PHRASE_BOOST = 5.0
 
 
-def _build_phrase_set_inline(hints: list[str]) -> list[cloud_speech_types.SpeechAdaptation.AdaptationPhraseSet]:
-    """Build inline PhraseSet(s) from hint list, splitting at 500 per set."""
+def _build_phrase_set_inline(hints: list[str], max_per_set: int = 1200,
+                             boost: float = 5.0) -> list[cloud_speech_types.SpeechAdaptation.AdaptationPhraseSet]:
+    """Build inline PhraseSet(s) from hint list, splitting at max_per_set per set."""
     if not hints:
         return []
 
     phrase_sets = []
-    for i in range(0, len(hints), MAX_PHRASES_PER_SET):
-        chunk = hints[i:i + MAX_PHRASES_PER_SET]
-        phrases = [cloud_speech_types.PhraseSet.Phrase(value=h, boost=5.0) for h in chunk]
+    for i in range(0, len(hints), max_per_set):
+        chunk = hints[i:i + max_per_set]
+        phrases = [cloud_speech_types.PhraseSet.Phrase(value=h, boost=boost) for h in chunk]
         phrase_set = cloud_speech_types.PhraseSet(phrases=phrases)
         adaptation_set = cloud_speech_types.SpeechAdaptation.AdaptationPhraseSet(
             inline_phrase_set=phrase_set
@@ -58,31 +60,40 @@ def _build_phrase_set_inline(hints: list[str]) -> list[cloud_speech_types.Speech
     return phrase_sets
 
 
-def _create_client_and_config(phrase_hints: list[str]):
+def _create_client_and_config(phrase_hints: list[str], asr_config: dict | None = None):
     """Create STT client and streaming config."""
+    cfg = asr_config or {}
+    stt_location = cfg.get("location", _DEFAULT_STT_LOCATION)
+    model = cfg.get("model", _DEFAULT_MODEL)
+    language_codes = cfg.get("language_codes", _DEFAULT_LANGUAGE_CODES)
+    sample_rate = cfg.get("sample_rate", _DEFAULT_SAMPLE_RATE)
+    max_phrases = cfg.get("max_phrases_per_set", _DEFAULT_MAX_PHRASES_PER_SET)
+    phrase_boost = cfg.get("phrase_boost", _DEFAULT_PHRASE_BOOST)
+
     creds, project_id = default()
 
     client = SpeechClient(
         client_options=ClientOptions(
-            api_endpoint=f"{STT_LOCATION}-speech.googleapis.com"
+            api_endpoint=f"{stt_location}-speech.googleapis.com"
         )
     )
 
-    recognizer = client.recognizer_path(project_id, STT_LOCATION, "_")
+    recognizer = client.recognizer_path(project_id, stt_location, "_")
 
     # Explicit decoding for raw PCM from browser AudioWorklet
     recognition_config = cloud_speech_types.RecognitionConfig(
         explicit_decoding_config=cloud_speech_types.ExplicitDecodingConfig(
             encoding=cloud_speech_types.ExplicitDecodingConfig.AudioEncoding.LINEAR16,
-            sample_rate_hertz=SAMPLE_RATE,
+            sample_rate_hertz=sample_rate,
             audio_channel_count=1,
         ),
-        language_codes=LANGUAGE_CODES,
-        model=MODEL,
+        language_codes=language_codes,
+        model=model,
     )
 
     # Add phrase hints for medical jargon recognition
-    phrase_sets = _build_phrase_set_inline(phrase_hints)
+    phrase_sets = _build_phrase_set_inline(phrase_hints, max_per_set=max_phrases,
+                                           boost=phrase_boost)
     if phrase_sets:
         recognition_config.adaptation = cloud_speech_types.SpeechAdaptation(
             phrase_sets=phrase_sets,
@@ -171,22 +182,24 @@ def _run_stt_stream(
     log.info("STT thread exiting")
 
 
-async def run_asr_bridge(ws, session):
+async def run_asr_bridge(ws, session, asr_config: dict | None = None):
     """
     Main entry point — called as an asyncio task from server.py.
 
     Pumps audio from session.audio_queue (async) → sync queue → STT thread,
     and STT results back into session.transcript_queue.
     """
+    cfg = asr_config or {}
     phrase_hints = getattr(session, "phrase_hints", [])
+    language_codes = cfg.get("language_codes", _DEFAULT_LANGUAGE_CODES)
 
     log.info(
         "ASR bridge starting (languages=%s, hints=%d)",
-        LANGUAGE_CODES, len(phrase_hints),
+        language_codes, len(phrase_hints),
     )
 
     try:
-        client, config_request = _create_client_and_config(phrase_hints)
+        client, config_request = _create_client_and_config(phrase_hints, asr_config=cfg)
     except Exception as e:
         log.exception("Failed to create STT client")
         await session.transcript_queue.put({"error": f"ASR init failed: {e}"})
