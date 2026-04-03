@@ -107,83 +107,7 @@ project/
 
 `config.yaml` is the **single source of truth** for all configuration. The server reads it on startup; all fields are optional — missing values use hardcoded defaults.
 
-```yaml
-# Server
-ssl:
-  cert: cert.pem
-  key: key.pem
-
-csv_file: "EHR_Menu - 20260226.csv"
-
-# Frontend defaults
-defaults:
-  procedure_type: endoscopy            # endoscopy | colonoscopy
-  dark_mode: false                     # true | false
-  study_type: retrospective            # retrospective | prospective
-  display_mode: landscape              # landscape | portrait
-
-# Page titles
-titles:
-  endoscopy: "AIG Endoscopy Report"
-  colonoscopy: "AIG Colonoscopy Report"
-
-# Video
-video:
-  fps: 25
-  extensions: [".mp4", ".avi", ".mov", ".mkv", ".wmv", ".flv", ".webm"]
-
-# ASR (Google Cloud Speech-to-Text v2)
-asr:
-  location: asia-southeast1
-  model: chirp_3
-  language_codes: ["en-IN", "hi-IN"]
-  sample_rate: 16000
-  max_phrases_per_set: 1200
-  phrase_boost: 5.0
-
-# LLM (Google Vertex AI Gemini)
-llm:
-  location: us-central1
-  model: gemini-2.5-flash
-  voice_temperature: 0.1
-  voice_max_tokens: 8192
-  sentences_temperature: 0.3
-  sentences_max_tokens: 8192
-
-# Voice pipeline
-voice:
-  debounce_seconds: 1.5
-  filler_words: ["um", "uh", "ah", "okay", "ok", "so", "like", "yeah", "yes", "hmm", "hm"]
-  commands:
-    pause: ["pause dictation", "stop recording", "pause"]
-    resume: ["resume dictation", "start recording", "resume"]
-    capture_photo: ["capture photo", "take photo", "take picture", "take a photo"]
-
-# Locations & sublocations (single source of truth for JS + Python)
-endoscopy:
-  locations: [Esophagus, GE Junction, Stomach, Duodenum]
-  sublocations:
-    Esophagus: [Cricopharynx, Upper, Middle, Lower, Whole esophagus, Anastomosis]
-    GE Junction: [Z-line, Hiatal hernia, Diaphragmatic pinch]
-    Stomach: null   # uses matrix
-    Duodenum: null  # uses matrix
-  matrices:
-    Stomach:
-      - region: Antrum
-        options: [Lesser Curvature, Greater Curvature, Posterior Wall, Anterior Wall, Entire]
-      # ... (see config.yaml for full structure)
-    Duodenum:
-      - region: D1 Bulb
-        options: [Anterior wall, Posterior wall, Superior wall, Inferior wall, Entire]
-      # ...
-
-colonoscopy:
-  locations: [Terminal Ileum, IC Valve, Caecum, Ascending Colon, ...]
-  sublocations:
-    Rectum: [Anterior wall, Posterior wall, Right Lateral wall, Left Lateral wall]
-    # other locations: []
-  matrices: {}
-```
+See `config.yaml` for the full configuration structure and all available options.
 
 ### Config Sections
 
@@ -239,127 +163,13 @@ colonoscopy:
 - **file:// mode**: `/api/config` fetch silently fails, JS uses hardcoded defaults in `05-constants.js`
 - **Config passed as function args**: `asr_bridge.py` and `llm_caller.py` receive config via function parameters (not importing config.yaml themselves), keeping them testable
 
-## Voice Dictation Architecture
+## Voice Dictation (HCI Layer)
 
-```
-Browser (Chrome)                          Python Backend (FastAPI)
-================                          =======================
+The app has an optional voice-based HCI layer: doctor speaks into a microphone → ASR (Google Cloud STT Chirp3) → LLM (Gemini 2.5 Flash) → automatic EHR form filling. This runs only in server mode (`python server.py`), not in standalone file:// mode.
 
-Microphone
-  → AudioWorklet (16kHz PCM Int16)
-  → WebSocket binary frames ──────────→  WebSocket handler (/ws/voice)
-                                              │
-                                              ├─→ audio_queue (asyncio.Queue)
-                                              │       │
-                                              │       ▼
-                                              │   ASR Bridge (background thread)
-                                              │     Google Cloud STT v2 streaming
-                                              │     Chirp3 model, phrase hints
-                                              │       │
-                                              │       ▼ transcript results
-                                              │   transcript_queue (asyncio.Queue)
-                                              │       │
-                                              │       ▼
-                                              │   Transcript Batcher
-                                              │     (debounce 1.5s, accumulate finals)
-                                              │       │
-                                              │       ▼
-                                              │   LLM Caller
-                                              │     Gemini 2.5 Flash (single-shot)
-                                              │     schema + current_report + transcript
-                                              │       │
-                                              │       ▼ updated report JSON
-  ← WebSocket text frame ←───────────────────┘
+**See [`VOICE_HCI.md`](VOICE_HCI.md) for full details** — architecture diagram, pipeline components, WebSocket protocol, ASR/LLM config, voice commands, garbage filtering, `applyVoiceUpdate()` behavior, batcher flush logic, sentences report, testing scripts, and testing checklist.
 
-applyVoiceUpdate(report)
-  → report = newReport
-  → populateColumns()
-  → renderSubLocChips()
-  → renderReport()
-  → openDetails() (preserve active disease)
-```
-
-### Voice Pipeline Components
-
-| Component | File | Purpose |
-|-----------|------|---------|
-| WebSocket Server | `server.py` | FastAPI app, serves frontend, WebSocket lifecycle management |
-| Session State | `server.py:SessionState` | Per-connection state: queues, report, schema, pause flag |
-| Transcript Batcher | `server.py:transcript_batcher()` | Debounce 1.5s, accumulate finals, pre-LLM filtering |
-| ASR Bridge | `asr_bridge.py` | Async→sync queue bridge, STT thread, auto-restart on 5min timeout |
-| LLM Caller | `llm_caller.py` | Gemini prompt construction, response parsing, lazy init |
-| Schema Builder | `schema_builder.py` | CSV → canonical schema JSON for LLM context |
-| Pydantic Models | `models.py` | EHRReport, DiseaseEntry, SectionEntry validation |
-| Frontend Voice | `src/js/19-voice.js` | Audio capture, WebSocket client, applyVoiceUpdate(), UI |
-| Frontend Settings | `src/js/21-settings.js` | Dark mode, study type, display mode, portrait layout, localStorage |
-
-### Voice Command Keywords (Pre-LLM Detection, configurable via `config.yaml` → `voice.commands`)
-
-| Command | Trigger Phrases (defaults) | Action |
-|---------|---------------------------|--------|
-| Pause | "pause dictation", "stop recording", "pause" | Stop sending finals to LLM; ASR continues for display |
-| Resume | "resume dictation", "start recording", "resume" | Resume LLM pipeline |
-| Capture Photo | "capture photo", "take photo", "take picture", "take a photo" | Dummy stub (logs to console) |
-
-### Two-Layer Garbage Filtering
-
-1. **Pre-LLM (server.py)**: Skip transcripts with <2 meaningful words after removing filler words (configurable via `config.yaml` → `voice.filler_words`). Also intercepts voice commands before LLM.
-2. **LLM Prompt**: Instructs Gemini to ignore non-medical chatter, past-tense references to other patients, non-Latin script (Hindi/Telugu side conversations), and return report unchanged when in doubt.
-
-### WebSocket Protocol
-
-**Client → Server:**
-
-| Frame | Format | Purpose |
-|-------|--------|---------|
-| Text | `{"type":"init", "csv_text":"...", "report":{...}, "procedure_type":"endoscopy"}` | Initialize session with CSV, current report, and procedure type |
-| Binary | Raw PCM Int16 bytes (16kHz mono) | Audio data from microphone |
-| Text | `{"type":"report_state", "report":{...}}` | Sync after manual UI edit |
-| Text | `{"type":"stop"}` | End dictation session |
-
-**Server → Client:**
-
-| Type | Fields | Purpose |
-|------|--------|---------|
-| `status` | `{asr, llm, paused}` | State indicators |
-| `interim_transcript` | `{text}` | Partial ASR result (display only, gray italic) |
-| `final_transcript` | `{text}` | Final ASR result (shown in black) |
-| `report_update` | `{report, overallRemarks}` | Updated report from LLM |
-| `capture_photo` | — | Photo capture command |
-| `error` | `{message}` | Error notification |
-| `info` | `{message}` | Informational (e.g., "ASR stream restarted") |
-
-### ASR Configuration (configurable via `config.yaml` → `asr` section)
-
-- **Location**: `asia-southeast1` (default)
-- **Model**: `chirp_3` (default)
-- **Languages**: `["en-IN", "hi-IN"]` (Chirp3 max 2 language codes)
-- **Sample rate**: 16kHz mono PCM Int16
-- **Phrase hints**: Loaded from `endoscopy_phraseset.txt` (manually curated), max 1200 per PhraseSet, boost=5.0
-- **Auto-restart**: On 5-minute STT stream timeout (OutOfRange exception)
-
-### LLM Configuration (configurable via `config.yaml` → `llm` section)
-
-- **Location**: `us-central1` (default)
-- **Model**: `gemini-2.5-flash` (default)
-- **Voice temperature**: 0.1 (default) / **Sentences temperature**: 0.3 (default)
-- **Max output tokens**: 8192 (default, for both voice and sentences)
-- **Response format**: `application/json` (constrained decoding, voice only)
-- **Prompt strategy**: Single-shot with schema + current report state + transcript each call
-
-### Manual Edit Sync
-
-When the user makes manual edits while voice is active:
-- `renderReport()` calls `voiceScheduleSync()` at the end (if voice module loaded)
-- `voiceScheduleSync()` debounces (500ms) and sends `report_state` message to backend
-- Backend updates `session.current_report` so next LLM call uses fresh state
-
-### CSV Text Flow for Voice
-
-`loadedCsvText` (global in `06-state.js`) stores raw CSV text for the backend:
-- Set by `17-csv-upload.js` in both file upload handler and sample loader
-- Sent to backend in the WebSocket `init` message by `19-voice.js`
-- Backend uses it to build the EHR schema via `schema_builder.py`
+Key backend files: `server.py`, `asr_bridge.py`, `llm_caller.py`, `schema_builder.py`, `models.py`. Key frontend files: `src/js/19-voice.js`, `src/js/20-sentences-report.js`. Config: `config.yaml` → `asr`, `llm`, `voice` sections.
 
 ## Layout Structure
 
@@ -376,14 +186,9 @@ When the user makes manual edits while voice is active:
    - Each column/pill shows applicable diseases from CSV
 
 2. **Sub-Location Section**
-   - Dynamic based on selected location
-   - Multi-select pills (click to toggle)
-   - **Esophagus**: Simple pill list (Cricopharynx, Upper, Middle, Lower, Whole esophagus, Anastomosis)
-   - **GE Junction**: Simple pill list (Z-line, Hiatal hernia, Diaphragmatic pinch)
-   - **Stomach**: Matrix layout (see below)
-   - **Duodenum**: Matrix layout (see below)
-   - **Rectum** (colonoscopy): Simple pill list (Anterior wall, Posterior wall, Right Lateral wall, Left Lateral wall)
-   - **Other colonoscopy locations** (Terminal Ileum, IC Valve, Caecum, Ascending Colon, Transverse Colon, Descending Colon, Sigmoid, Anal Canal): No sub-locations
+   - Dynamic based on selected location; multi-select pills (click to toggle)
+   - Some locations use simple pill lists, others (Stomach, Duodenum) use matrix layout
+   - All sublocation values defined in `config.yaml` → `endoscopy.sublocations` / `colonoscopy.sublocations`
 
 3. **Details Section**
    - Appears when a disease is selected
@@ -391,40 +196,15 @@ When the user makes manual edits while voice is active:
    - Disease-specific frame inputs (Start Frame, End Frame, Segmentation Frame)
    - Additional Comments text box
 
-### Stomach Sub-Location Matrix
+### Sub-Location Matrices
 
-| Region | Options |
-|--------|---------|
-| Antrum (pill) | Lesser Curvature, Greater Curvature, Posterior Wall, Anterior Wall, Entire |
-| Incisura (pill) | Lesser Curvature, Posterior Wall, Anterior Wall, Entire |
-| Lower Body (pill) | Lesser Curvature, Greater Curvature, Posterior Wall, Anterior Wall, Entire |
-| Middle Upper Body (pill) | Lesser Curvature, Greater Curvature, Posterior Wall, Anterior Wall, Entire |
-| Fundus (pill) | Lesser Curvature, Greater Curvature, Posterior Wall, Anterior Wall, Entire |
-| Other (heading) | Whole Stomach, Whole Body, Cardia, Prepyloric region, Pylorus, Anastomosis |
-
-### Duodenum Sub-Location Matrix
-
-| Region | Options |
-|--------|---------|
-| D1 Bulb (pill) | Anterior wall, Posterior wall, Superior wall, Inferior wall, Entire |
-| D2 (pill) | Ampullary region, Medial wall, Lateral wall, Inferior wall, Superior wall, Entire |
-| Other (heading) | D1-D2 junction, D3, D4, Anastomosis, Major papilla, Minor papilla |
+Matrix structures for Stomach and Duodenum are defined in `config.yaml` → `endoscopy.matrices`. See config.yaml for full region/option details.
 
 **Matrix Behavior**: Selecting an option in column 2 auto-selects the region pill in column 1. Deselecting all options for a region auto-deselects the region.
 
 ### Colonoscopy Locations (Portrait Mode Only)
 
-| Location | Sub-Locations |
-|----------|--------------|
-| Terminal Ileum | (none) |
-| IC Valve | (none) |
-| Caecum | (none) |
-| Ascending Colon | (none) |
-| Transverse Colon | (none) |
-| Descending Colon | (none) |
-| Sigmoid | (none) |
-| Rectum | Anterior wall, Posterior wall, Right Lateral wall, Left Lateral wall |
-| Anal Canal | (none) |
+Colonoscopy locations and sublocations are defined in `config.yaml` → `colonoscopy`. Only Rectum has sublocations.
 
 ### Right Pane Components
 
@@ -618,23 +398,6 @@ Format: `Subsection(Name=Value)` or `Section(Name=Value)`
 - Manual load via "Load Saved JSON" button
 - Restores: report data, frame inputs, PII state, last active disease
 
-### Voice Update (applyVoiceUpdate)
-- Lightweight version of `loadJsonFromText()` for real-time LLM updates
-- Does NOT touch `__retroMeta` (UHID, video, frames, PII stay unchanged during dictation)
-- Does NOT update `lastSavedReportState` (report remains "unsaved")
-- DOES validate disease names against loaded `DISEASES` object
-- DOES normalize sublocations (same logic as `loadJsonFromText()`)
-- DOES auto-add matrix region names when "Region - Option" sublocations are present (e.g., adds "Antrum" when "Antrum - Posterior Wall" exists)
-- DOES detect newly added diseases and switch `active` to the latest one (so details pane opens automatically)
-- DOES preserve currently active disease if no new diseases were added
-- Calls `populateColumns()`, `renderSubLocChips()`, `renderReport()`, `openDetails()`
-
-### Batcher Flush on Stop
-- When dictation stops, the `finally` block sends `{"flush": True}` to the transcript queue
-- Batcher handles flush by breaking the debounce loop and processing remaining accumulated text
-- Server waits up to 15s for the batcher to finish (including final LLM call) before cleanup
-- Ensures the last spoken sentence is always processed
-
 ## Data Model
 
 ### Report Structure
@@ -695,72 +458,6 @@ Format: `Subsection(Name=Value)` or `Section(Name=Value)`
 }
 ```
 
-### EHR Schema (for LLM context, generated by schema_builder.py)
-
-The schema varies by procedure type. `build_schema(csv_text, procedure_type)` takes a `procedure_type` parameter (`"endoscopy"` or `"colonoscopy"`) to select the appropriate location columns from the CSV.
-
-**Endoscopy example:**
-```json
-{
-  "locations": ["Esophagus", "GE Junction", "Stomach", "Duodenum"],
-  "sublocations": {
-    "Esophagus": ["Cricopharynx", "Upper", "Middle", ...],
-    "Stomach": {
-      "Antrum": ["Lesser Curvature", ...],
-      "_standalone": ["Whole Stomach", ...]
-    }
-  },
-  "diseases": {
-    "Gastric Ulcer": {
-      "locations": ["Stomach"],
-      "default_sublocation": "",
-      "sections": {
-        "Number": { "multi": false, "attributes": ["Single", "Multiple (2-5)", ...] },
-        "Forrest Classification": { "multi": false, "attributes": [...] }
-      }
-    }
-  }
-}
-```
-
-**Colonoscopy example:**
-```json
-{
-  "locations": ["Terminal Ileum", "IC Valve", "Caecum", "Ascending Colon", "Transverse Colon", "Descending Colon", "Sigmoid", "Rectum", "Anal Canal"],
-  "sublocations": {
-    "Rectum": ["Anterior wall", "Posterior wall", "Right Lateral wall", "Left Lateral wall"]
-  },
-  "diseases": {
-    "Polyp": {
-      "locations": ["Caecum", "Ascending Colon", "Transverse Colon", ...],
-      "default_sublocation": "",
-      "sections": { ... }
-    }
-  }
-}
-```
-
-### Pydantic Models (models.py)
-
-```
-EHRReport
-├── report: dict[str, LocationEntry]    # Keys: location names
-│   └── LocationEntry
-│       └── diseases: dict[str, DiseaseEntry]
-│           └── DiseaseEntry
-│               ├── sublocations: list[str]
-│               ├── sections: dict[str, SectionEntry]
-│               │   └── SectionEntry
-│               │       ├── attrs: dict[str, bool]
-│               │       ├── inputs: list[InputGroup]
-│               │       └── subsections: dict[str, SubsectionEntry]
-│               ├── comments: str
-│               └── startFrame/endFrame/segmentationFrame: Optional[int]
-└── overallRemarks: str
-```
-
-Validation pipeline: Parse JSON → Pydantic model_validate → strip invalid locations → validate disease names against schema → validate disease-location compatibility (e.g., reject "Esophageal Varices" under "Stomach") → remove hallucinated/misplaced diseases.
-
 ## CSS Classes
 
 ### Pills
@@ -782,33 +479,6 @@ Validation pipeline: Parse JSON → Pydantic model_validate → strip invalid lo
 - `body.dark` - Dark mode active (applied to `<body>`)
 - All Tailwind utility overrides under `body.dark` selector (e.g., `body.dark .bg-white`)
 - `.toggle-switch` / `.toggle-knob` - Custom toggle switch for dark mode
-
-## Known Issues & Fixes Applied
-
-1. ✅ Location-specific section filtering
-2. ✅ Conditional logic with section context
-3. ✅ Disease frame data synchronization
-4. ✅ Frame validation with red warning
-5. ✅ Clear button resets UHID/Video
-6. ✅ UHID change warns only for unsaved changes
-7. ✅ Previous UHID selection restored on cancel
-8. ✅ `loadedCsvText` shared via `06-state.js` (was duplicated/lost between `17-csv-upload.js` and `19-voice.js`)
-9. ✅ `voiceScheduleSync()` wired to `renderReport()` (was defined but never called)
-10. ✅ Disease-location validation in `models.py` (LLM could place diseases under wrong locations)
-11. ✅ Matrix region auto-select on voice update (e.g., "Antrum" auto-selected when "Antrum - Posterior Wall" set by LLM)
-12. ✅ New disease auto-opens in details pane (voice update now detects newly added diseases)
-13. ✅ Batcher flush on stop (last sentence no longer lost when stopping dictation)
-14. ✅ Sentences report PDF rendering (html2canvas requires element in normal document flow, not positioned off-viewport)
-15. ✅ Settings panel with dark mode, study type, and display mode
-16. ✅ Prospective mode with patient demographics (UHID, Name, Gender, Age, Indication)
-17. ✅ Portrait display mode with disease-first interaction model
-18. ✅ Dark mode via CSS overrides (avoids touching JS rendering functions)
-19. ✅ Multi-location disease support in portrait mode (e.g., Ulcer added separately to Stomach and Duodenum)
-20. ✅ Colonoscopy support with 9 location columns and Rectum sub-locations
-21. ✅ Procedure type toggle (endoscopy/colonoscopy) with localStorage persistence
-22. ✅ CSV auto-load on page start (server `/api/csv` + file:// fallback)
-23. ✅ CSV file input moved to settings panel
-24. ✅ Centralized config.yaml — all hardcoded constants (locations, sublocations, matrices, ASR/LLM config, titles, FPS, voice commands, filler words, debounce) moved to config.yaml as single source of truth for both JS and Python
 
 ## Development Notes
 
@@ -840,17 +510,6 @@ Backend logging: Python `logging` module, logger name `"ehr-voice"`, level INFO.
 | `generatePDF()` | `15-pdf-generation` | Generate PDF from report data |
 | `updateFrameCalculations()` | `13-retro-video` | Calculate frame count and duration |
 | `hasUnsavedChanges()` | `13-retro-video` | Check if report differs from last save |
-| `applyVoiceUpdate(data)` | `19-voice` | Apply LLM-produced report update to UI |
-| `_voiceStart()` / `_voiceStop()` | `19-voice` | Start/stop dictation (audio + WebSocket) |
-| `voiceScheduleSync()` | `19-voice` | Debounced sync of manual edits to backend |
-| `build_schema(csv_text, procedure_type, config)` | `schema_builder` | CSV → canonical EHR schema dict (filtered by procedure type, locations from config) |
-| `call_llm(schema, report, remarks, transcript, procedure_type, llm_config)` | `llm_caller` | Gemini call to update EHR from transcript |
-| `validate_llm_response(data, schema)` | `models` | Pydantic validation of LLM output |
-| `run_asr_bridge(ws, session, asr_config)` | `asr_bridge` | Main ASR entry point (async task) |
-| `transcript_batcher(ws, session)` | `server` | Debounce + batch finals → LLM calls |
-| `generate_sentences_report(json, llm_config)` | `llm_caller` | Gemini call to convert EHR JSON → prose HTML |
-| `_sentencesGenerate()` | `20-sentences-report` | Main handler: modal + API call + Quill init |
-| `_sentencesGeneratePdf()` | `20-sentences-report` | html2pdf.js PDF generation from Quill content |
 | `toggleDarkMode()` | `21-settings` | Toggle dark mode on/off, update CSS class + localStorage |
 | `applyStudyType(type)` | `21-settings` | Switch between retrospective/prospective, show/hide control bars |
 | `applyDisplayMode(mode)` | `21-settings` | Switch between landscape/portrait, DOM rearrangement |
@@ -892,31 +551,6 @@ Backend logging: Python `logging` module, logger name `"ehr-voice"`, level INFO.
 }
 ```
 
-### Running Test Scripts
-
-```bash
-# Test Google Cloud STT (requires mic + Google credentials)
-python stream_test_mic.py
-
-# Test Gemini API connectivity
-python gemini_test.py
-```
-
-### Schema Builder CLI
-
-```bash
-# Generate EHR schema JSON from CSV (for inspection)
-python schema_builder.py "EHR_Menu - 20260224.csv"
-```
-
-### ASR Phrase Hints
-
-`endoscopy_phraseset.txt` contains manually curated medical phrases (one per line, alphabetically sorted) that help Google Cloud STT recognize endoscopy jargon. The file was initially generated from the CSV but is now maintained by hand.
-
-- Edit the file directly to add/remove phrases
-- Google API limit: 1200 phrases per PhraseSet
-- `server.py` loads the file on each dictation session start
-
 ## Testing Checklist
 
 ### Manual EHR
@@ -932,25 +566,6 @@ python schema_builder.py "EHR_Menu - 20260224.csv"
 - [ ] Test UHID change warning with unsaved data
 - [ ] Test Clear button resets everything
 - [ ] Verify PDF generation
-
-### Voice Dictation
-- [ ] `python server.py` → app loads at http://localhost:8000
-- [ ] Existing app works identically when served via FastAPI
-- [ ] Voice button disabled when no CSV loaded / when opened via file://
-- [ ] Voice button enabled after CSV load on HTTP
-- [ ] Click "Start Dictation" → mic permission prompt → "Listening..." status
-- [ ] Partial transcripts appear gray italic in transcript bar
-- [ ] Final transcripts appear in black
-- [ ] After ~2s debounce, "AI Processing..." appears
-- [ ] Report updates automatically from voice (diseases, sublocations, attributes)
-- [ ] Corrections work: "Correction, it's lesser curvature" overrides previous
-- [ ] "Remove [disease]" removes it from report
-- [ ] "Pause dictation" → shows PAUSED, stops LLM calls, ASR still runs
-- [ ] "Resume dictation" → resumes LLM pipeline
-- [ ] "Capture photo" → toast notification (stub)
-- [ ] Click "Stop Dictation" → mic releases, button returns to green
-- [ ] Manual pill clicks during voice session sync to backend
-- [ ] Save button works normally with voice-entered data
 
 ### Settings Panel
 - [ ] Gear icon visible top-right corner
@@ -983,17 +598,6 @@ python schema_builder.py "EHR_Menu - 20260224.csv"
 - [ ] Sentences report includes prospective patient data in payload
 - [ ] Sentences PDF uses prospective UHID in filename
 
-### Sentences Report
-- [ ] Button visible below Overall Remarks
-- [ ] Click with empty report → alert, no modal
-- [ ] Click with findings → modal opens with loading spinner
-- [ ] Gemini generates prose → Quill editor appears with formatted text
-- [ ] Toolbar works: bold, italic, underline, headings, lists
-- [ ] Text is editable in Quill editor
-- [ ] "Submit and Create PDF Report" → PDF downloads
-- [ ] PDF has title, formatted content, readable layout
-- [ ] Modal closes via X button, ESC key, or backdrop click
-
 ### Colonoscopy Mode
 - [ ] Toggle to Colonoscopy in settings → report clears, portrait forces
 - [ ] 9 location pills appear (Terminal Ileum through Anal Canal)
@@ -1010,17 +614,6 @@ python schema_builder.py "EHR_Menu - 20260224.csv"
 - [ ] Server mode: CSV auto-loads on page start
 - [ ] CSV file input available in settings panel
 - [ ] Manual CSV upload still works from settings
-
-### Sentences Report
-
-Converts structured EHR JSON into natural-language prose via Gemini, displayed in a Quill.js rich text editor:
-
-1. Doctor clicks **"Generate Sentences Report"** button (below Overall Remarks)
-2. Modal opens with loading spinner → `POST /api/generate-report` calls Gemini
-3. Gemini returns HTML with `<h2>` locations, `<h3>` diseases, `<p>` sentences
-4. Quill.js editor loads the HTML with Gmail-style toolbar (bold, italic, underline, headings, lists)
-5. Doctor reviews/edits → clicks **"Submit and Create PDF Report"** → html2pdf.js generates A4 PDF
-6. Requires server mode (not available in file:// mode)
 
 ## Future Features (Not Yet Implemented)
 
